@@ -1,0 +1,16 @@
+# .readthedocs.yaml
+
+version: 2
+
+#Python version
+python:
+  version: "3.10"
+  install:
+    - method: pip
+      path: .
+      extra_requirements:
+        - numba # Install numba as an extra requirement
+
+#specify the sphinx configuration file
+sphinx:
+  configuration: docs/source/conf.py
