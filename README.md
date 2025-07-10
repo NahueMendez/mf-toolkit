@@ -9,12 +9,12 @@ This project provides robust and efficient implementations of key algorithms suc
 
 ## Main Features
 
-* Fast MFDFA:** Efficient implementation of MFDFA analysis.
-* Parallel Processing:** Optimized to utilize multiple CPU cores.
-* Dual Engine:** Uses **Numba** for maximum performance or a Scikit-learn backend for easy installation.
-* Crossover Detection:** Includes SPIC and CDVA methods to identify crossover changes.
-* Surrogate Generation:** Creates test data with IAAFT and Shuffling methods.
-* Robust Validation:** The code includes validations to ensure scientifically consistent results.
+* **Fast MFDFA**: Efficient implementation of MFDFA analysis.
+* **Parallel Processing**: Optimized to utilize multiple CPU cores.
+* **Dual Engine**: Uses *Numba* for maximum performance or a Scikit-learn backend for easy installation.
+* **Crossover Detection**: Includes SPIC and CDVA methods to identify crossover changes.
+* **Surrogate Generation**: Creates test data with IAAFT and Shuffling methods.
+* **Validated Results**: Automatically filters and returns only the range of `q` where the multifractal parameters are mathematically plausible, avoiding numerical instabilities.
 
 ## Installation
 
@@ -29,7 +29,7 @@ To install the performance-optimized version of Numba, use:
 pip install mf-toolkit[numba]
 ```
 
-## Quick Use
+## Example of Usage
 
 Here is a simple example of how to use the main `mfdfa` function:
 
@@ -189,6 +189,11 @@ if __name__ == '__main__':
     plt.show()
 
 ```
+## Note on Monofractal Series
+
+It is important to note that `mf-toolkit` is designed with rigorous validations. If MFDFA is applied to a series that is **monofractal** (or has a very weak multifractal structure), it is *expected* behavior for the library to return a very small range of valid `q`, or even none at all.
+
+This is not an error, but a feature: the algorithm is correctly indicating that there is no rich, mathematically coherent multifractal spectrum in the signal. The signature of a monofractal series in this analysis is precisely an almost constant `h(q)` range and a very narrow singularity spectrum that does not pass the validation filters. In this case, please use DFA (Detrended Fluctuation Analysis).
 
 ## How to Cite
 
