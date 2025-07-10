@@ -1,0 +1,10 @@
+pyproject.toml
+mf_toolkit.egg-info/PKG-INFO
+mf_toolkit.egg-info/SOURCES.txt
+mf_toolkit.egg-info/dependency_links.txt
+mf_toolkit.egg-info/requires.txt
+mf_toolkit.egg-info/top_level.txt
+mftoolkit/MFDFA.py
+mftoolkit/__init__.py
+mftoolkit/crossovers.py
+mftoolkit/mfsources.py
