@@ -78,11 +78,11 @@
 <span class="sd">    distribution and adjusts the surrogate&#39;s power spectrum to match the</span>
 <span class="sd">    original spectrum, providing a more accurate surrogate for hypothesis</span>
 <span class="sd">    testing against a linear stochastic process with possible non-Gaussian</span>
-<span class="sd">    distribution of values [1].</span>
+<span class="sd">    distribution of values [3].</span>
 
 <span class="sd">    References</span>
 <span class="sd">    ----------</span>
-<span class="sd">    [1] Schreiber, T., &amp; Schmitz, A. (2000). Surrogate time series.</span>
+<span class="sd">    [3] Schreiber, T., &amp; Schmitz, A. (2000). Surrogate time series.</span>
 <span class="sd">        Physica D: Nonlinear Phenomena, 142(3-4), 346-382. </span>
 <span class="sd">        doi:10.1016/s0167-2789(00)00043-9 </span>
 <span class="sd">    &quot;&quot;&quot;</span>
@@ -189,20 +189,19 @@
 
 
 
-
-<span class="kn">import</span> <span class="nn">numpy</span>
-<span class="kn">import</span> <span class="nn">numpy.random</span>
-<span class="kn">import</span> <span class="nn">numpy.fft</span>
-
 <span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
-<span class="kn">import</span> <span class="nn">time</span>
 <span class="kn">from</span> <span class="nn">joblib</span> <span class="kn">import</span> <span class="n">Parallel</span><span class="p">,</span> <span class="n">delayed</span>
 <span class="kn">import</span> <span class="nn">os</span>
 
 <span class="k">def</span> <span class="nf">_generate_single_surrogate</span><span class="p">(</span><span class="n">original_data</span><span class="p">,</span> <span class="n">detrend</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Generates a single surrogate time series using the IAAFT algorithm.</span>
-<span class="sd">    This is the worker function for parallel processing.</span>
+<span class="sd">    Generate a surrogate time series using the IAAFT algorithm.</span>
+
+<span class="sd">    This method creates a surrogate series that has the same power spectrum</span>
+<span class="sd">    (and thus the same linear autocorrelation) and the same amplitude</span>
+<span class="sd">    distribution (histogram) as the original series. It is used to create</span>
+<span class="sd">    a null model for hypothesis testing, where any nonlinear structure</span>
+<span class="sd">    present in the original data is destroyed.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="c1"># Seed the random number generator for reproducibility in parallel processes</span>
     <span class="k">if</span> <span class="n">seed</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
@@ -281,7 +280,7 @@
 
 <span class="sd">    References</span>
 <span class="sd">    ----------</span>
-<span class="sd">    [1] Schreiber, T., &amp; Schmitz, A. (1996). Improved surrogate data for</span>
+<span class="sd">    [3] Schreiber, T., &amp; Schmitz, A. (1996). Improved surrogate data for</span>
 <span class="sd">        nonlinearity tests. Physical review letters, 77(4), 635.</span>
 <span class="sd">    &quot;&quot;&quot;</span>
     <span class="c1"># --- Input validation ---</span>
@@ -293,7 +292,7 @@
     <span class="c1"># --- Information and Parallel Execution ---</span>
     <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
         <span class="n">num_cores</span> <span class="o">=</span> <span class="n">n_jobs</span> <span class="k">if</span> <span class="n">n_jobs</span> <span class="o">!=</span> <span class="o">-</span><span class="mi">1</span> <span class="k">else</span> <span class="n">os</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">()</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">### Starting IAAFT routine to generate </span><span class="si">{</span><span class="n">num_surrogates</span><span class="si">}</span><span class="s2"> surrogates on </span><span class="si">{</span><span class="n">num_cores</span><span class="si">}</span><span class="s2"> cores ###&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Starting IAAFT routine to generate </span><span class="si">{</span><span class="n">num_surrogates</span><span class="si">}</span><span class="s2"> surrogates on </span><span class="si">{</span><span class="n">num_cores</span><span class="si">}</span><span class="s2"> cores</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="c1"># Use joblib.Parallel to run the surrogate generation in parallel</span>
     <span class="c1"># The &#39;verbose&#39; parameter provides a progress bar</span>
@@ -312,7 +311,7 @@
     <span class="n">averaged_surrogate</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">surrogates_array</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
 
     <span class="k">if</span> <span class="n">verbose</span><span class="p">:</span>
-        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;### Successfully generated and averaged </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">surrogate_list</span><span class="p">)</span><span class="si">}</span><span class="s2"> surrogates. ###</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
+        <span class="nb">print</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Successfully generated and averaged </span><span class="si">{</span><span class="nb">len</span><span class="p">(</span><span class="n">surrogate_list</span><span class="p">)</span><span class="si">}</span><span class="s2"> surrogates.</span><span class="se">\n</span><span class="s2">&quot;</span><span class="p">)</span>
 
     <span class="k">return</span> <span class="n">averaged_surrogate</span></div>
 
