@@ -44,11 +44,11 @@ def iaaft_surrogate(original_series: np.ndarray, max_iter: int = 100, tol: float
     distribution and adjusts the surrogate's power spectrum to match the
     original spectrum, providing a more accurate surrogate for hypothesis
     testing against a linear stochastic process with possible non-Gaussian
-    distribution of values [1].
+    distribution of values [3].
 
     References
     ----------
-    [1] Schreiber, T., & Schmitz, A. (2000). Surrogate time series.
+    [3] Schreiber, T., & Schmitz, A. (2000). Surrogate time series.
         Physica D: Nonlinear Phenomena, 142(3-4), 346-382. 
         doi:10.1016/s0167-2789(00)00043-9 
     """
@@ -151,20 +151,19 @@ def shuffle_surrogate(original_series: np.ndarray, num_shuffles: int = 100) -> l
     return shuffle
 
 
-
-import numpy
-import numpy.random
-import numpy.fft
-
 import numpy as np
-import time
 from joblib import Parallel, delayed
 import os
 
 def _generate_single_surrogate(original_data, detrend=False, seed=None):
     """
-    Generates a single surrogate time series using the IAAFT algorithm.
-    This is the worker function for parallel processing.
+    Generate a surrogate time series using the IAAFT algorithm.
+
+    This method creates a surrogate series that has the same power spectrum
+    (and thus the same linear autocorrelation) and the same amplitude
+    distribution (histogram) as the original series. It is used to create
+    a null model for hypothesis testing, where any nonlinear structure
+    present in the original data is destroyed.
     """
     # Seed the random number generator for reproducibility in parallel processes
     if seed is not None:
@@ -241,7 +240,7 @@ def generate_iaaft_surrogate(original_data, num_surrogates=50, detrend=False, ve
 
     References
     ----------
-    [1] Schreiber, T., & Schmitz, A. (1996). Improved surrogate data for
+    [3] Schreiber, T., & Schmitz, A. (1996). Improved surrogate data for
         nonlinearity tests. Physical review letters, 77(4), 635.
     """
     # --- Input validation ---
@@ -253,7 +252,7 @@ def generate_iaaft_surrogate(original_data, num_surrogates=50, detrend=False, ve
     # --- Information and Parallel Execution ---
     if verbose:
         num_cores = n_jobs if n_jobs != -1 else os.cpu_count()
-        print(f"\n### Starting IAAFT routine to generate {num_surrogates} surrogates on {num_cores} cores ###")
+        print(f"Starting IAAFT routine to generate {num_surrogates} surrogates on {num_cores} cores\n")
 
     # Use joblib.Parallel to run the surrogate generation in parallel
     # The 'verbose' parameter provides a progress bar
@@ -272,7 +271,7 @@ def generate_iaaft_surrogate(original_data, num_surrogates=50, detrend=False, ve
     averaged_surrogate = np.mean(surrogates_array, axis=0)
 
     if verbose:
-        print(f"### Successfully generated and averaged {len(surrogate_list)} surrogates. ###\n")
+        print(f"Successfully generated and averaged {len(surrogate_list)} surrogates.\n")
 
     return averaged_surrogate
 
