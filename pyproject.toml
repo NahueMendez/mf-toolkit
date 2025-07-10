@@ -4,7 +4,7 @@ build-backend = "setuptools.build_meta"
 
 [project]
 name = "mf-toolkit"
-version = "0.1.2"
+version = "0.1.3"
 authors = [
   { name="Nahuel Mendez", email="nahueldanielmendez@gmail.com" },
 { name="Sebastian Jaroszewicz", email="sebasjaro@gmail.com" }
