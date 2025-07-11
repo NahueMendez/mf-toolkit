@@ -1,6 +1,6 @@
 # mf-toolkit
 
-[![PyPI version](https://badge.fury.io/py/mf-toolkit.svg)](https://pypi.org/project/mf-toolkit/0.1.0/)
+[![PyPI version](https://badge.fury.io/py/mf-toolkit.svg)](https://pypi.org/project/mf-toolkit/0.1.3/)
 [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.15858623.svg)](https://doi.org/10.5281/zenodo.15858623)
 
 A high-performance Python toolkit for the analysis of multifractal time series and complex systems.
