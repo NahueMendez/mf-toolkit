@@ -65,7 +65,7 @@ the exponent h(q). If None (default), all valid scales are used.</p>
 <section id="return">
 <h3>Return:<a class="headerlink" href="#return" title="Link to this heading">¶</a></h3>
 <dl class="simple">
-<dt>q<span class="classifier">ndarray</span></dt><dd><p>q-values valid for the time series after applying theoretical and concavity masks.</p>
+<dt>q<span class="classifier">ndarray</span></dt><dd><p>q-values valid for the time series</p>
 </dd>
 <dt>h_q<span class="classifier">ndarray</span></dt><dd><p>The generalized Hurst exponent for each value of q.</p>
 </dd>
@@ -79,6 +79,126 @@ the exponent h(q). If None (default), all valid scales are used.</p>
 </dd>
 </dl>
 </section>
+</dd></dl>
+
+</section>
+<section id="module-mftoolkit.mfsources">
+<span id="sources-module"></span><h2>Sources module<a class="headerlink" href="#module-mftoolkit.mfsources" title="Link to this heading">¶</a></h2>
+<p>Created on Fri Jun 27 10:14:32 2025</p>
+<p>&#64;author: Nahuel Mendez &amp; Sebastian Jaroszewicz</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="mftoolkit.mfsources.generate_iaaft_surrogate">
+<span class="sig-prename descclassname"><span class="pre">mftoolkit.mfsources.</span></span><span class="sig-name descname"><span class="pre">generate_iaaft_surrogate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">original_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_surrogates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">50</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">detrend</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_jobs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mftoolkit/mfsources.html#generate_iaaft_surrogate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mftoolkit.mfsources.generate_iaaft_surrogate" title="Link to this definition">¶</a></dt>
+<dd><p>Generates multiple surrogate time series using the IAAFT algorithm in parallel
+and returns the average of all generated surrogates.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>original_data</strong> (<em>array_like</em>) – The 1D input time series to create surrogates from.</p></li>
+<li><p><strong>num_surrogates</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of surrogate time series to generate before averaging.
+Default is 50.</p></li>
+<li><p><strong>detrend</strong> (<em>bool</em><em>, </em><em>optional</em>) – Specifies whether the time series has to be detrended prior to
+surrogate generation. Default is False.</p></li>
+<li><p><strong>verbose</strong> (<em>bool</em><em>, </em><em>optional</em>) – Sets the verbosity of the function. If True (default), progress
+messages are displayed.</p></li>
+<li><p><strong>n_jobs</strong> (<em>int</em><em>, </em><em>optional</em>) – The number of CPU cores to use for parallel generation. -1 means
+using all available cores. Default is -1.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A single 1D array representing the average of all generated surrogates.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>This function uses the ‘joblib’ library for parallel processing to speed up
+the generation of multiple independent surrogates. Each surrogate preserves
+the power spectrum and amplitude distribution of the original series.</p>
+<p class="rubric">References</p>
+<dl class="simple">
+<dt>[1] Schreiber, T., &amp; Schmitz, A. (1996). Improved surrogate data for</dt><dd><p>nonlinearity tests. Physical review letters, 77(4), 635.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mftoolkit.mfsources.iaaft_surrogate">
+<span class="sig-prename descclassname"><span class="pre">mftoolkit.mfsources.</span></span><span class="sig-name descname"><span class="pre">iaaft_surrogate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">original_series</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_iter</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1e-06</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="reference internal" href="_modules/mftoolkit/mfsources.html#iaaft_surrogate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mftoolkit.mfsources.iaaft_surrogate" title="Link to this definition">¶</a></dt>
+<dd><p>Generate a surrogate time series using the IAAFT algorithm.</p>
+<p>This method creates a surrogate series that has the same power spectrum
+(and thus the same linear autocorrelation) and the same amplitude
+distribution (histogram) as the original series. It is used to create
+a null model for hypothesis testing, where any nonlinear structure
+present in the original data is destroyed.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>original_series</strong> (<em>array_like</em>) – The 1D input time series to create a surrogate from.</p></li>
+<li><p><strong>max_iter</strong> (<em>int</em><em>, </em><em>optional</em>) – Maximum number of iterations for the IAAFT algorithm.
+Defaults to 1000.</p></li>
+<li><p><strong>tol</strong> (<em>float</em><em>, </em><em>optional</em>) – Tolerance for convergence. The iteration stops if the relative
+change in the spectrum error is less than this value.
+Defaults to 1e-8.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The generated surrogate time series.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The Iterative Amplitude Adjusted Fourier Transform (IAAFT) algorithm is
+an improvement over the simple phase-randomized surrogate method.
+It iteratively adjusts the surrogate’s amplitudes to match the original
+distribution and adjusts the surrogate’s power spectrum to match the
+original spectrum, providing a more accurate surrogate for hypothesis
+testing against a linear stochastic process with possible non-Gaussian
+distribution of values [1].</p>
+<p class="rubric">References</p>
+<dl class="simple">
+<dt>[1] Schreiber, T., &amp; Schmitz, A. (2000). Surrogate time series.</dt><dd><p>Physica D: Nonlinear Phenomena, 142(3-4), 346-382.
+doi:10.1016/s0167-2789(00)00043-9</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mftoolkit.mfsources.shuffle_surrogate">
+<span class="sig-prename descclassname"><span class="pre">mftoolkit.mfsources.</span></span><span class="sig-name descname"><span class="pre">shuffle_surrogate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">original_series</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_shuffles</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">100</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">ndarray</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/mftoolkit/mfsources.html#shuffle_surrogate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mftoolkit.mfsources.shuffle_surrogate" title="Link to this definition">¶</a></dt>
+<dd><p>Generate surrogate time series by randomly shuffling the original series.</p>
+<p>This method creates surrogate series that have the exact same amplitude
+distribution (histogram) as the original series. However, it destroys all
+temporal structures, including both linear and non-linear correlations,
+by randomly reordering the data points.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>original_series</strong> (<em>array_like</em>) – The 1D input time series to create surrogates from.</p></li>
+<li><p><strong>num_surrogates</strong> (<em>int</em><em>, </em><em>optional</em>) – The number of shuffled surrogate series to generate.
+Defaults to 100.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A list containing the generated surrogate time series. Each element
+of the list is a NumPy array.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>list of np.ndarray</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>Shuffled surrogates are used to test the null hypothesis (H0) that the
+observed data is indistinguishable from an Independent and Identically
+Distributed (IID) random process. If a metric calculated on the
+original series falls outside the distribution of the same metric
+calculated on these surrogates, it suggests the presence of some form of
+temporal structure or memory in the data.
+This is a less constrained null hypothesis than that of IAAFT surrogates,
+which preserve the linear correlation (power spectrum).</p>
 </dd></dl>
 
 </section>
@@ -195,126 +315,6 @@ crossovers.</p>
 </dd></dl>
 
 </section>
-<section id="module-mftoolkit.mfsources">
-<span id="sources-module"></span><h2>Sources module<a class="headerlink" href="#module-mftoolkit.mfsources" title="Link to this heading">¶</a></h2>
-<p>Created on Fri Jun 27 10:14:32 2025</p>
-<p>&#64;author: Nahuel Mendez &amp; Sebastian Jaroszewicz</p>
-<dl class="py function">
-<dt class="sig sig-object py" id="mftoolkit.mfsources.generate_iaaft_surrogate">
-<span class="sig-prename descclassname"><span class="pre">mftoolkit.mfsources.</span></span><span class="sig-name descname"><span class="pre">generate_iaaft_surrogate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">original_data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_surrogates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">50</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">detrend</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">verbose</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_jobs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mftoolkit/mfsources.html#generate_iaaft_surrogate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mftoolkit.mfsources.generate_iaaft_surrogate" title="Link to this definition">¶</a></dt>
-<dd><p>Generates multiple surrogate time series using the IAAFT algorithm in parallel
-and returns the average of all generated surrogates.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>original_data</strong> (<em>array_like</em>) – The 1D input time series to create surrogates from.</p></li>
-<li><p><strong>num_surrogates</strong> (<em>int</em><em>, </em><em>optional</em>) – Number of surrogate time series to generate before averaging.
-Default is 50.</p></li>
-<li><p><strong>detrend</strong> (<em>bool</em><em>, </em><em>optional</em>) – Specifies whether the time series has to be detrended prior to
-surrogate generation. Default is False.</p></li>
-<li><p><strong>verbose</strong> (<em>bool</em><em>, </em><em>optional</em>) – Sets the verbosity of the function. If True (default), progress
-messages are displayed.</p></li>
-<li><p><strong>n_jobs</strong> (<em>int</em><em>, </em><em>optional</em>) – The number of CPU cores to use for parallel generation. -1 means
-using all available cores. Default is -1.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>A single 1D array representing the average of all generated surrogates.</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>np.ndarray</p>
-</dd>
-</dl>
-<p class="rubric">Notes</p>
-<p>This function uses the ‘joblib’ library for parallel processing to speed up
-the generation of multiple independent surrogates. Each surrogate preserves
-the power spectrum and amplitude distribution of the original series.</p>
-<p class="rubric">References</p>
-<dl class="simple">
-<dt>[3] Schreiber, T., &amp; Schmitz, A. (1996). Improved surrogate data for</dt><dd><p>nonlinearity tests. Physical review letters, 77(4), 635.</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="mftoolkit.mfsources.iaaft_surrogate">
-<span class="sig-prename descclassname"><span class="pre">mftoolkit.mfsources.</span></span><span class="sig-name descname"><span class="pre">iaaft_surrogate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">original_series</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_iter</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">100</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">1e-06</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="reference internal" href="_modules/mftoolkit/mfsources.html#iaaft_surrogate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mftoolkit.mfsources.iaaft_surrogate" title="Link to this definition">¶</a></dt>
-<dd><p>Generate a surrogate time series using the IAAFT algorithm.</p>
-<p>This method creates a surrogate series that has the same power spectrum
-(and thus the same linear autocorrelation) and the same amplitude
-distribution (histogram) as the original series. It is used to create
-a null model for hypothesis testing, where any nonlinear structure
-present in the original data is destroyed.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>original_series</strong> (<em>array_like</em>) – The 1D input time series to create a surrogate from.</p></li>
-<li><p><strong>max_iter</strong> (<em>int</em><em>, </em><em>optional</em>) – Maximum number of iterations for the IAAFT algorithm.
-Defaults to 1000.</p></li>
-<li><p><strong>tol</strong> (<em>float</em><em>, </em><em>optional</em>) – Tolerance for convergence. The iteration stops if the relative
-change in the spectrum error is less than this value.
-Defaults to 1e-8.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>The generated surrogate time series.</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>np.ndarray</p>
-</dd>
-</dl>
-<p class="rubric">Notes</p>
-<p>The Iterative Amplitude Adjusted Fourier Transform (IAAFT) algorithm is
-an improvement over the simple phase-randomized surrogate method.
-It iteratively adjusts the surrogate’s amplitudes to match the original
-distribution and adjusts the surrogate’s power spectrum to match the
-original spectrum, providing a more accurate surrogate for hypothesis
-testing against a linear stochastic process with possible non-Gaussian
-distribution of values [3].</p>
-<p class="rubric">References</p>
-<dl class="simple">
-<dt>[3] Schreiber, T., &amp; Schmitz, A. (2000). Surrogate time series.</dt><dd><p>Physica D: Nonlinear Phenomena, 142(3-4), 346-382.
-doi:10.1016/s0167-2789(00)00043-9</p>
-</dd>
-</dl>
-</dd></dl>
-
-<dl class="py function">
-<dt class="sig sig-object py" id="mftoolkit.mfsources.shuffle_surrogate">
-<span class="sig-prename descclassname"><span class="pre">mftoolkit.mfsources.</span></span><span class="sig-name descname"><span class="pre">shuffle_surrogate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">original_series</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_shuffles</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">100</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">ndarray</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/mftoolkit/mfsources.html#shuffle_surrogate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mftoolkit.mfsources.shuffle_surrogate" title="Link to this definition">¶</a></dt>
-<dd><p>Generate surrogate time series by randomly shuffling the original series.</p>
-<p>This method creates surrogate series that have the exact same amplitude
-distribution (histogram) as the original series. However, it destroys all
-temporal structures, including both linear and non-linear correlations,
-by randomly reordering the data points.</p>
-<dl class="field-list simple">
-<dt class="field-odd">Parameters<span class="colon">:</span></dt>
-<dd class="field-odd"><ul class="simple">
-<li><p><strong>original_series</strong> (<em>array_like</em>) – The 1D input time series to create surrogates from.</p></li>
-<li><p><strong>num_surrogates</strong> (<em>int</em><em>, </em><em>optional</em>) – The number of shuffled surrogate series to generate.
-Defaults to 100.</p></li>
-</ul>
-</dd>
-<dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>A list containing the generated surrogate time series. Each element
-of the list is a NumPy array.</p>
-</dd>
-<dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>list of np.ndarray</p>
-</dd>
-</dl>
-<p class="rubric">Notes</p>
-<p>Shuffled surrogates are used to test the null hypothesis (H0) that the
-observed data is indistinguishable from an Independent and Identically
-Distributed (IID) random process. If a metric calculated on the
-original series falls outside the distribution of the same metric
-calculated on these surrogates, it suggests the presence of some form of
-temporal structure or memory in the data.
-This is a less constrained null hypothesis than that of IAAFT surrogates,
-which preserve the linear correlation (power spectrum).</p>
-</dd></dl>
-
-</section>
 </section>
 
 
@@ -338,8 +338,8 @@ which preserve the linear correlation (power spectrum).</p>
 <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">API References</a><ul>
 <li class="toctree-l2"><a class="reference internal" href="#module-mftoolkit.MFDFA">MFDFA module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#module-mftoolkit.crossovers">Crossovers module</a></li>
 <li class="toctree-l2"><a class="reference internal" href="#module-mftoolkit.mfsources">Sources module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-mftoolkit.crossovers">Crossovers module</a></li>
 </ul>
 </li>
 </ul>

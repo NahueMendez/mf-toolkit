@@ -10,12 +10,13 @@ MFDFA module
 .. automodule:: mftoolkit.MFDFA
    :members:
 
-Crossovers module
---------------------
-.. automodule:: mftoolkit.crossovers
-   :members:
 
 Sources module
 -----------------
 .. automodule:: mftoolkit.mfsources
+   :members:
+
+Crossovers module
+--------------------
+.. automodule:: mftoolkit.crossovers
    :members:
