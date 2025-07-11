@@ -1,26 +1,29 @@
 [build-system]
-requires = ["setuptools >= 77.0.3"]
+requires = ["setuptools>=61.0"]
 build-backend = "setuptools.build_meta"
+
+[tool.setuptools.packages.find]
+exclude = ["docs*", "tests*", "venv_build*"]
 
 [project]
 name = "mf-toolkit"
-version = "0.1.3"
+version = "0.1.3" #Current version
 authors = [
   { name="Nahuel Mendez", email="nahueldanielmendez@gmail.com" },
-{ name="Sebastian Jaroszewicz", email="sebasjaro@gmail.com" }
+  { name="Sebastian Jaroszewicz", email="sebasjaro@gmail.com" }
 ]
 description = "A high-performance Python toolkit for the analysis of multifractal time series and complex systems."
 readme = "README.md"
-license = { file="LICENSE" }
+license = "MIT"
 requires-python = ">=3.8"
 
 classifiers = [
     "Programming Language :: Python :: 3",
-    "License :: OSI Approved :: MIT License",
     "Operating System :: OS Independent",
     "Intended Audience :: Science/Research",
     "Topic :: Scientific/Engineering :: Physics",
 ]
+
 dependencies = [
     "numpy",
     "scipy",
@@ -31,4 +34,4 @@ dependencies = [
 numba = ["numba"]
 
 [project.urls]
-"Homepage" = "https://github.com/NahueMendez/mf-toolkit"
+"Homepage" = "https://github.com/NahueMendez/mf-toolkit" 
