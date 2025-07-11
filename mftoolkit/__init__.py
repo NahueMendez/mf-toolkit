@@ -1,6 +1,6 @@
 from .MFDFA import mfdfa
 from .crossovers import SPIC, CDVA
-from .mfsources import iaaft_surrogate, shuffle_surrogate
+from .mfsources import generate_iaaft, shuffle_surrogate
 
 __version__ = "1.0.0"
 
