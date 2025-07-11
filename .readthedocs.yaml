@@ -1,6 +1,6 @@
 # .readthedocs.yaml
 
-version: 4
+version: 2
 
 #Python version
 python:
