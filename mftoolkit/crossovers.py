@@ -526,7 +526,7 @@ def find_crossover(M):
 def CDVA(logS, logFq, q, method=1, q_column=None, use_numba=False):
     """Crossover Detection based on Variance of slope Differences (CDV-A).
 
-    This function implements the CDV-A algorithm [1] to find the most
+    This function implements the CDV-A algorithm [2] to find the most
     prominent crossover point in a log-log plot of fluctuation functions
     Fq(s) vs. scales s.
 
@@ -568,7 +568,7 @@ def CDVA(logS, logFq, q, method=1, q_column=None, use_numba=False):
 
     References
     ----------
-    [1] Moreno-Pulido, S., de la Torre, J.C., Ruiz, P. et al. Crossover
+    [2] Moreno-Pulido, S., de la Torre, J.C., Ruiz, P. et al. Crossover
         detection based on variances of slope differences for multi-fractal
         detrended fluctuation analysis (MF-DFA). Nonlinear Dyn 113, 
         7425–7457 (2025). https://doi.org/10.1007/s11071-024-10478-1"""

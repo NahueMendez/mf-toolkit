@@ -1,3 +1,5 @@
+LICENSE
+README.md
 pyproject.toml
 mf_toolkit.egg-info/PKG-INFO
 mf_toolkit.egg-info/SOURCES.txt
@@ -8,3 +10,4 @@ mftoolkit/MFDFA.py
 mftoolkit/__init__.py
 mftoolkit/crossovers.py
 mftoolkit/mfsources.py
+mftoolkit/test.py
