@@ -253,7 +253,7 @@ def SPIC(x_obs, y_obs, max_k_to_test=3, num_permutations=200,
 
     References
     ----------
-    [1] Ge, E., & Leung, Y. (2012). Detection of crossover time scales in multifractal detrended fluctuation analysis.
+     [1] Ge, E., & Leung, Y. (2012). Detection of crossover time scales in multifractal detrended fluctuation analysis.
       Journal of Geographical Systems, 15(2), 115–147. doi:10.1007/s10109-012-0169-9
 
     """

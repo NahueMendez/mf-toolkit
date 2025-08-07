@@ -100,7 +100,7 @@ def _process_scale(s_val, profile_data, q_values_arr, poly_order, N_len, process
 #--------MFDFA (Multifractal Detrended Fluctuation Analysis) in parallel using multiprocessing--------#
 #-----------------------------------------------------------------------------------------------------#
 def mfdfa(data, q_values, scales, order=1, num_cores=None,
-          segments_from_both_ends=False,scale_range_for_hq=None):
+          segments_from_both_ends=False,scale_range_for_hq=None,validate=True):
     """
     Performs Multifractal Detrended Fluctuations Analysis (MFDFA) in parallel.
 
@@ -122,11 +122,14 @@ def mfdfa(data, q_values, scales, order=1, num_cores=None,
     scale_range_for_hq : tuple or list, optional
         Tuple (min_s, max_s) defines the scale range to be used to calculate 
         the exponent h(q). If None (default), all valid scales are used.
+    validate: bool, optional
+        If True (default), theoretical and concavity masks are applied to validate numerical results
+        If False, numerical values are returned without a validation step. 
 
     Return:
     --------
     q   : ndarray
-        q-values valid for the time series after applying theoretical and concavity masks.
+        q-values or moment exponents
     h_q : ndarray
         The generalized Hurst exponent for each value of q.
     tau_q : ndarray
@@ -272,66 +275,70 @@ def mfdfa(data, q_values, scales, order=1, num_cores=None,
     # =========================================================================
     #. Singularity spectrum cant be negative or greater than 1. 
     #. Alpha must be positive
+    if validate:
+        initial_mask = (f_alpha_arr >= 0) & (alpha_arr > 0) & (f_alpha_arr <= 1)
+        #.Find q=0 or nearest
+        center_idx = np.argmin(np.abs(q_values))
+        # Verify if is a valid point
+        if not initial_mask[center_idx]:
+            warnings.warn("The central point is not valid. Can't define a robust range.")
+            return q_values_arr,nan_res, nan_res, nan_res, nan_res, F_q_s_matrix
+        # Expand from center to the right
+        valid_end_idx = center_idx
+        while valid_end_idx + 1 < len(initial_mask) and initial_mask[valid_end_idx + 1]:
+            valid_end_idx += 1
     
-    initial_mask = (f_alpha_arr >= 0) & (alpha_arr > 0) & (f_alpha_arr <= 1)
-    #.Find q=0 or nearest
-    center_idx = np.argmin(np.abs(q_values))
-    # Verify if is a valid point
-    if not initial_mask[center_idx]:
-        warnings.warn("The central point is not valid. Can't define a robust range.")
-        return np.zeros_like(initial_mask, dtype=bool)
-    # Expand from center to the right
-    valid_end_idx = center_idx
-    while valid_end_idx + 1 < len(initial_mask) and initial_mask[valid_end_idx + 1]:
-        valid_end_idx += 1
-
-    # Expand from the left to the center
-    valid_start_idx = center_idx
-    while valid_start_idx - 1 >= 0 and initial_mask[valid_start_idx - 1]:
-        valid_start_idx -= 1
+        # Expand from the left to the center
+        valid_start_idx = center_idx
+        while valid_start_idx - 1 >= 0 and initial_mask[valid_start_idx - 1]:
+            valid_start_idx -= 1
+            
+        # Build theoretical mask
+        theoretical_mask = np.zeros_like(initial_mask, dtype=bool)
+        theoretical_mask[valid_start_idx : valid_end_idx + 1] = True
         
-    # Build theoretical mask
-    theoretical_mask = np.zeros_like(initial_mask, dtype=bool)
-    theoretical_mask[valid_start_idx : valid_end_idx + 1] = True
-    
-    #.Sigularity spectra cannot grow (from max to edges)
-    if len(f_alpha_arr) < 3:
-       return np.ones_like(f_alpha_arr, dtype=bool)
-   
-    # Start from the mid
-    idx_mid = np.argmin(np.abs(alpha_arr - np.median(alpha_arr)))
-    #.From max to the right
-    idx_derecho = idx_mid
-    while idx_derecho + 1 < len(f_alpha_arr) and f_alpha_arr[idx_derecho + 1] < f_alpha_arr[idx_derecho]:
-        idx_derecho += 1
-    #.From max to the left
-    idx_izquierdo = idx_mid
-    while idx_izquierdo - 1 >= 0 and f_alpha_arr[idx_izquierdo - 1] < f_alpha_arr[idx_izquierdo]:
-        idx_izquierdo -= 1
+        #.Sigularity spectra cannot grow (from max to edges)
+        if len(f_alpha_arr) < 3:
+           return np.ones_like(f_alpha_arr, dtype=bool)
+       
+        # Start from the mid
+        idx_mid = np.argmin(np.abs(alpha_arr - np.median(alpha_arr)))
+        #.From max to the right
+        idx_derecho = idx_mid
+        while idx_derecho + 1 < len(f_alpha_arr) and f_alpha_arr[idx_derecho + 1] < f_alpha_arr[idx_derecho]:
+            idx_derecho += 1
+        #.From max to the left
+        idx_izquierdo = idx_mid
+        while idx_izquierdo - 1 >= 0 and f_alpha_arr[idx_izquierdo - 1] < f_alpha_arr[idx_izquierdo]:
+            idx_izquierdo -= 1
+            
+        #.Build concavity mask
+        concavity_mask = np.zeros_like(f_alpha_arr, dtype=bool)
+        concavity_mask[idx_izquierdo : idx_derecho + 1] = True    
         
-    #.Build concavity mask
-    concavity_mask = np.zeros_like(f_alpha_arr, dtype=bool)
-    concavity_mask[idx_izquierdo : idx_derecho + 1] = True    
-    
-    #.Build final mask (valid only when both are True)
-    final_mask = theoretical_mask & concavity_mask
-    
-    # =========================================================================
-    # --- APPLY MASKS ---
-    # =========================================================================
-    if not np.any(final_mask):
-        warnings.warn("No q-values valid for this scale range. Probably the series is not multifractal.")
-        nan_res = np.full(len(q_values_arr), np.nan)
-        # Return empty arrays
-        return q_values_arr, nan_res, nan_res, nan_res, nan_res, F_q_s_matrix
-    
-    #.Trim arrays
-    q_valid = q_values[final_mask]
-    h_q_valid = h_q_arr[final_mask]
-    tau_q_valid = tau_q_arr[final_mask]
-    alpha_valid = alpha_arr[final_mask]
-    f_alpha_valid = f_alpha_arr[final_mask]
-    F_q_s_valid_matrix = F_q_s_matrix[final_mask, :]
-    logger.info(f"q-values trimmed to: [{np.min(q_valid):.2f},{np.max(q_valid):.2f}]")
-    return q_valid, h_q_valid, tau_q_valid, alpha_valid, f_alpha_valid, F_q_s_valid_matrix
+        #.Build final mask (valid only when both are True)
+        final_mask = theoretical_mask & concavity_mask
+        
+        # =========================================================================
+        # --- APPLY MASKS ---
+        # =========================================================================
+        
+        if not np.any(final_mask):
+            warnings.warn("No q-values valid for this scale range. Probably the series is not multifractal.")
+            nan_res = np.full(len(q_values_arr), np.nan)
+            # Return empty arrays
+            return q_values_arr, nan_res, nan_res, nan_res, nan_res, F_q_s_matrix
+        
+        #.Trim arrays
+        q_valid = q_values[final_mask]
+        h_q_valid = h_q_arr[final_mask]
+        tau_q_valid = tau_q_arr[final_mask]
+        alpha_valid = alpha_arr[final_mask]
+        f_alpha_valid = f_alpha_arr[final_mask]
+        F_q_s_valid_matrix = F_q_s_matrix[final_mask, :]
+        logger.info(f"q-values trimmed to: [{np.min(q_valid):.2f},{np.max(q_valid):.2f}]")
+        return q_valid, h_q_valid, tau_q_valid, alpha_valid, f_alpha_valid, F_q_s_valid_matrix
+    else:
+        #.No validation filters applied 
+        return q_values_arr, h_q_arr, tau_q_arr, alpha_arr, f_alpha_arr, F_q_s_matrix
     
