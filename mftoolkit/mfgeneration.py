@@ -90,13 +90,13 @@ def generate_mf_dist (n_points,H:float, power=2.0):
     component), while `power` controls the strength of the multifractality.
 
     """
-        # 1. Generate a monofractal base with linear correlations (fGn)
-        fgn_base = generate_fgn(H,n_points)
+    # 1. Generate a monofractal base with linear correlations (fGn)
+    fgn_base = generate_fgn(H,n_points)
 
-        # 2. Apply a non-linear transformation to introduce multifractality.
-        multifractal_series = np.abs(fgn_base)**power
+    # 2. Apply a non-linear transformation to introduce multifractality.
+    multifractal_series = np.abs(fgn_base)**power
 
-        return (multifractal_series - np.mean(multifractal_series)) / np.std(multifractal_series)
+    return (multifractal_series - np.mean(multifractal_series)) / np.std(multifractal_series)
 
 def generate_mf_corr(n_points: int, a: float = 0.3) -> np.ndarray:
     """Generates a multifractal series with a perfect Gaussian PDF.
