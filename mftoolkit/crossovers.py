@@ -246,14 +246,14 @@ def SPIC(x_obs, y_obs, max_k_to_test=3, num_permutations=200,
     Notes
     -----
     This function implements the sequential hypothesis testing method using
-    permutations, as described in [1], to determine the optimal number of
+    permutations, as described in [4], to determine the optimal number of
     crossovers in a piecewise linear regression model. The core idea is to
     sequentially test a model with K crossovers against a model with K+1
     crossovers.
 
     References
     ----------
-     [1] Ge, E., & Leung, Y. (2012). Detection of crossover time scales in multifractal detrended fluctuation analysis.
+     [4] Ge, E., & Leung, Y. (2012). Detection of crossover time scales in multifractal detrended fluctuation analysis.
       Journal of Geographical Systems, 15(2), 115–147. doi:10.1007/s10109-012-0169-9
 
     """
@@ -564,11 +564,11 @@ def CDVA(logS, logFq, q, method=1, q_column=None, use_numba=False):
     The CDV-A method identifies potential crossover regions by analyzing the
     variance of the differences between left-side and right-side log-log
     slopes, computed across multiple window sizes. This implementation is
-    based on the description and MATLAB code provided in [1].
+    based on the description and MATLAB code provided in [3].
 
     References
     ----------
-    [2] Moreno-Pulido, S., de la Torre, J.C., Ruiz, P. et al. Crossover
+    [3] Moreno-Pulido, S., de la Torre, J.C., Ruiz, P. et al. Crossover
         detection based on variances of slope differences for multi-fractal
         detrended fluctuation analysis (MF-DFA). Nonlinear Dyn 113, 
         7425–7457 (2025). https://doi.org/10.1007/s11071-024-10478-1"""

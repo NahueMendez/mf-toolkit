@@ -1,9 +1,16 @@
+"""
+Created on Wed Jun 18 12:49:42 2025
+
+@author: Nahuel Mendez & Sebastian Jaroszewicz
+"""
+
 import numpy as np
 from scipy import stats
 import multiprocessing
 import os
 import warnings,logging
 logger = logging.getLogger(__name__)
+
 
 # MFDFA (Multifractal Detrended Fluctuation Analysis) - Auxiliary function
 def _process_scale(s_val, profile_data, q_values_arr, poly_order, N_len, process_from_end=False):

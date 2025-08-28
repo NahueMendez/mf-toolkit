@@ -128,14 +128,14 @@ def generate_iaaft(original_series, num_surrogates=1, max_iter=1000, tol=1e-8, n
     -----
     The Iterative Amplitude Adjusted Fourier Transform (IAAFT) algorithm
     iteratively adjusts the surrogate's amplitudes and power spectrum to
-    match the original series [3]. It is used to test against the null hypothesis
+    match the original series [2]. It is used to test against the null hypothesis
     of a stationary linear stochastic process with a possibly non-Gaussian
     distribution of values. This implementation uses Python's `multiprocessing`
     module to parallelize the generation of multiple surrogates. 
 
     References
     ----------
-    [3] Schreiber, T., & Schmitz, A. (2000). Surrogate time series.
+    [2] Schreiber, T., & Schmitz, A. (2000). Surrogate time series.
         Physica D: Nonlinear Phenomena, 142(3-4), 346-382."""
     
     original_series = np.asarray(original_series)
