@@ -93,7 +93,7 @@ def _iaaft_worker(args):
 
 
 
-def generate_iaaft(original_series, num_surrogates=1, max_iter=1000, tol=1e-8, n_jobs=-1):
+def iaaft_surrogate(original_series, num_surrogates=1, max_iter=1000, tol=1e-8, n_jobs=-1):
     """Generates one or more surrogate time series using the IAAFT algorithm.
 
     This method creates surrogate series that preserve the power spectrum
