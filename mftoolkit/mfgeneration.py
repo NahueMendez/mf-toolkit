@@ -6,7 +6,7 @@ Created on Thu Aug 28 12:22:42 2025
 """
 import numpy as np 
 import warnings as warning
-
+from scipy.fft import fft, ifft, fftfreq
 
 def generate_fgn(H: float, n_points: int) -> np.ndarray:
     """Generates a time serie of a fractional Gaussian noise (fGn)
@@ -175,3 +175,74 @@ def generate_mf_corr(n_points: int, a: float = 0.3) -> np.ndarray:
     final_series = sorted_gaussian[cascade_ranks]
 
     return final_series
+
+
+def generate_crossover_series(N, alpha1, alpha2, crossover_scale, sampling_rate=1.0, seed=None):
+    """
+    Generate time series with DFA crossover behavior using Fourier Filtering Method (FFM).
+
+    Parameters:
+    -----------
+    N : int
+        Length of time series (recommended: N >= 10^4)
+    alpha1 : float
+        Short-term scaling exponent (DFA exponent for s < crossover_scale)
+    alpha2 : float
+        Long-term scaling exponent (DFA exponent for s > crossover_scale)
+    crossover_scale : float
+        The temporal scale where transition occurs
+    sampling_rate : float
+        Sampling rate (default: 1.0)
+    seed : int, optional
+        Seed for the random number generator (default: None)
+
+    Returns:
+    --------
+    time_series : ndarray
+        Generated time series with crossover behavior
+    time : ndarray
+        Time array
+    """
+
+    # Step 1: Generate base random series
+    if seed is not None:
+        np.random.seed(seed)
+    random_series = np.random.randn(N)
+
+    # Step 2: Define crossover parameters
+    fc = 1.0 / crossover_scale  # Crossover frequency
+
+    # Convert DFA exponents to power spectral exponents: β = 2α - 1
+    beta1 = 2 * alpha1 - 1  # For high frequencies (short scales)
+    beta2 = 2 * alpha2 - 1  # For low frequencies (long scales)
+
+    # Step 3: Construct modified power spectrum
+    # Get Fourier transform of random series
+    X = fft(random_series)
+    freqs = fftfreq(N, d=1.0/sampling_rate)
+
+    # Avoid zero frequency (DC component)
+    freqs[0] = freqs[1]  # Set DC to same as first non-zero frequency
+
+    # Create power spectrum S(f)
+    S = np.zeros_like(freqs, dtype=complex)
+
+    for i, f in enumerate(freqs):
+        abs_f = abs(f)
+        if abs_f > fc:  # High frequencies, short scales
+            S[i] = abs_f**(-beta1/2)  # Square root because we multiply with X
+        else:  # Low frequencies, long scales
+            S[i] = abs_f**(-beta2/2)
+
+    # Step 4: Apply spectral modification
+    # Multiply Fourier transform by square root of desired power spectrum
+    X_modified = X * S
+
+    # Step 5: Generate time series
+    # Apply inverse Fourier transform
+    time_series = np.real(ifft(X_modified))
+
+    # Create time array
+    time = np.arange(N) / sampling_rate
+
+    return time_series, time
