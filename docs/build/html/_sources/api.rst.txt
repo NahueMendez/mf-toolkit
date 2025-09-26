@@ -20,3 +20,8 @@ Crossovers module
 --------------------
 .. automodule:: mftoolkit.crossovers
    :members:
+
+Generation module
+--------------------
+.. automodule:: mftoolkit.mfgeneration
+   :members:

@@ -14,7 +14,8 @@ This project provides robust and efficient implementations of key algorithms suc
 * **Dual Engine**: Uses *Numba* for maximum performance or a Scikit-learn backend for easy installation.
 * **Crossover Detection**: Includes SPIC and CDVA methods to identify crossover changes.
 * **Surrogate Generation**: Creates test data with IAAFT and Shuffling methods.
-* **Validated Results**: Automatically filters and returns only the range of `q` where the multifractal parameters are mathematically plausible, avoiding numerical instabilities.
+* **Validated Results**: Optional filters that returns only the range of `q` where the multifractal parameters are mathematically plausible, avoiding numerical instabilities.
+* **Generator Functions**: Algorithms that generates monofractal and multifractal series, even with crossovers in their fluctuation functions. 
 
 ## Installation
 
@@ -35,7 +36,7 @@ Here is a simple example of how to use the main `mfdfa` function:
 
 ```python
 import numpy as np
-from mf_toolkit import mfdfa,SPIC
+from mftoolkit import mfdfa,SPIC
 import multiprocessing
 import matplotlib.pyplot as plt 
 
