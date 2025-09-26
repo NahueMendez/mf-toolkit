@@ -7,7 +7,7 @@ exclude = ["docs*", "tests*", "venv_build*",".github*"]
 
 [project]
 name = "mf-toolkit"
-version = "1.0.0" #Current version
+version = "1.1.1" #Current version
 authors = [
   { name="Nahuel Mendez", email="nahueldanielmendez@gmail.com" },
   { name="Sebastian Jaroszewicz", email="sebasjaro@gmail.com" }
