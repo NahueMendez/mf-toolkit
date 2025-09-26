@@ -1,0 +1,702 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>mftoolkit.crossovers &#8212; mf-toolkit 0.1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css?v=27fed22d" />
+    <script src="../../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for mftoolkit.crossovers</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Created on Wed Jun 18 12:49:42 2025</span>
+
+<span class="sd">@author: Nahuel Mendez &amp; Sebastian Jaroszewicz</span>
+<span class="sd">&quot;&quot;&quot;</span>
+
+<span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="c1"># crossover_analysis.py</span>
+
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">sklearn.linear_model</span><span class="w"> </span><span class="kn">import</span> <span class="n">LinearRegression</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">itertools</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">multiprocessing</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">scipy.signal</span><span class="w"> </span><span class="kn">import</span> <span class="n">find_peaks</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span><span class="o">,</span><span class="nn">logging</span>
+<span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
+
+<span class="c1"># --- 1. SAFE NUMBA IMPORT ---</span>
+<span class="k">try</span><span class="p">:</span>
+    <span class="kn">from</span><span class="w"> </span><span class="nn">numba</span><span class="w"> </span><span class="kn">import</span> <span class="n">njit</span><span class="p">,</span> <span class="n">prange</span>
+    <span class="n">NUMBA_AVAILABLE</span> <span class="o">=</span> <span class="kc">True</span>
+<span class="k">except</span> <span class="ne">ImportError</span><span class="p">:</span>
+    <span class="n">NUMBA_AVAILABLE</span> <span class="o">=</span> <span class="kc">False</span>
+    <span class="c1"># Define a dummy decorator if numba is not available, so the code doesn&#39;t crash</span>
+    <span class="k">def</span><span class="w"> </span><span class="nf">njit</span><span class="p">(</span><span class="n">parallel</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+        <span class="k">def</span><span class="w"> </span><span class="nf">decorator</span><span class="p">(</span><span class="n">func</span><span class="p">):</span>
+            <span class="k">return</span> <span class="n">func</span>
+        <span class="k">return</span> <span class="n">decorator</span>
+    <span class="n">prange</span> <span class="o">=</span> <span class="nb">range</span>
+
+
+<span class="c1">################################################################################</span>
+<span class="c1">############################ SPIC Method  ######################################</span>
+<span class="c1">################################################################################</span>
+
+<span class="c1"># =============================================================================</span>
+<span class="c1"># CALCULATION ENGINE #1: NUMBA-OPTIMIZED VERSION</span>
+<span class="c1"># =============================================================================</span>
+
+<span class="nd">@njit</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_solve_linear_regression_numba</span><span class="p">(</span><span class="n">X</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Solves a linear regression using Numba.&quot;&quot;&quot;</span>
+    <span class="c1"># Check if the matrix is singular to avoid errors</span>
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">cond</span><span class="p">(</span><span class="n">X</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">X</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mf">1e15</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="n">X</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">],</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="n">y</span><span class="o">.</span><span class="n">shape</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span>
+    
+    <span class="n">coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">solve</span><span class="p">(</span><span class="n">X</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">X</span><span class="p">,</span> <span class="n">X</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">y</span><span class="p">)</span>
+    <span class="n">y_pred</span> <span class="o">=</span> <span class="n">X</span> <span class="o">@</span> <span class="n">coeffs</span>
+    <span class="n">sse</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">((</span><span class="n">y</span> <span class="o">-</span> <span class="n">y_pred</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+    <span class="k">return</span> <span class="n">sse</span><span class="p">,</span> <span class="n">coeffs</span><span class="p">,</span> <span class="n">y_pred</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_fit_model_numba</span><span class="p">(</span><span class="n">x_obs_sorted</span><span class="p">,</span> <span class="n">y_obs_sorted</span><span class="p">,</span> <span class="n">num_crossovers</span><span class="p">,</span> <span class="n">min_points_per_segment</span><span class="o">=</span><span class="mi">3</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Fits piecewise regression models using the Numba engine.&quot;&quot;&quot;</span>
+    <span class="n">n_points</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">x_obs_sorted</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">num_crossovers</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">X_design</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">n_points</span><span class="p">,</span> <span class="mi">2</span><span class="p">))</span>
+        <span class="n">X_design</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">x_obs_sorted</span>
+        <span class="n">sse</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">y_pred</span> <span class="o">=</span> <span class="n">_solve_linear_regression_numba</span><span class="p">(</span><span class="n">X_design</span><span class="p">,</span> <span class="n">y_obs_sorted</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">isinf</span><span class="p">(</span><span class="n">sse</span><span class="p">):</span> <span class="k">return</span> <span class="kc">None</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;best_taus&#39;</span><span class="p">:</span> <span class="p">[],</span> <span class="s1">&#39;min_sse&#39;</span><span class="p">:</span> <span class="n">sse</span><span class="p">,</span> <span class="s1">&#39;y_pred&#39;</span><span class="p">:</span> <span class="n">y_pred</span><span class="p">}</span>
+
+    <span class="c1"># Validations</span>
+    <span class="k">if</span> <span class="n">n_points</span> <span class="o">&lt;</span> <span class="n">min_points_per_segment</span> <span class="o">*</span> <span class="p">(</span><span class="n">num_crossovers</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span> <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">unique_x_values</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">x_obs_sorted</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">unique_x_values</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">num_crossovers</span> <span class="o">+</span> <span class="mi">2</span><span class="p">:</span> <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">potential_tau_values</span> <span class="o">=</span> <span class="n">unique_x_values</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">potential_tau_values</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">num_crossovers</span><span class="p">:</span> <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="n">min_sse_val</span><span class="p">,</span> <span class="n">best_taus_list</span><span class="p">,</span> <span class="n">best_y_pred</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="s1">&#39;inf&#39;</span><span class="p">),</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
+
+    <span class="k">for</span> <span class="n">current_taus_combination</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">combinations</span><span class="p">(</span><span class="n">potential_tau_values</span><span class="p">,</span> <span class="n">num_crossovers</span><span class="p">):</span>
+        <span class="n">current_taus</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">current_taus_combination</span><span class="p">))</span>
+        
+        <span class="c1"># Segmentation validation</span>
+        <span class="n">valid_segmentation</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">x_obs_sorted</span> <span class="o">&lt;=</span> <span class="n">current_taus</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">&lt;</span> <span class="n">min_points_per_segment</span><span class="p">:</span> <span class="n">valid_segmentation</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="n">valid_segmentation</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_crossovers</span> <span class="o">-</span> <span class="mi">1</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">((</span><span class="n">x_obs_sorted</span> <span class="o">&gt;</span> <span class="n">current_taus</span><span class="p">[</span><span class="n">i</span><span class="p">])</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">x_obs_sorted</span> <span class="o">&lt;=</span> <span class="n">current_taus</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]))</span> <span class="o">&lt;</span> <span class="n">min_points_per_segment</span><span class="p">:</span>
+                    <span class="n">valid_segmentation</span> <span class="o">=</span> <span class="kc">False</span><span class="p">;</span> <span class="k">break</span>
+        <span class="k">if</span> <span class="n">valid_segmentation</span> <span class="ow">and</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">x_obs_sorted</span> <span class="o">&gt;</span> <span class="n">current_taus</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span> <span class="o">&lt;</span> <span class="n">min_points_per_segment</span><span class="p">:</span> <span class="n">valid_segmentation</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">valid_segmentation</span><span class="p">:</span> <span class="k">continue</span>
+
+        <span class="n">X_design</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">((</span><span class="n">n_points</span><span class="p">,</span> <span class="n">num_crossovers</span> <span class="o">+</span> <span class="mi">2</span><span class="p">))</span>
+        <span class="n">X_design</span><span class="p">[:,</span> <span class="mi">1</span><span class="p">]</span> <span class="o">=</span> <span class="n">x_obs_sorted</span>
+        <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">tau_val</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">current_taus</span><span class="p">):</span>
+            <span class="n">X_design</span><span class="p">[:,</span> <span class="n">i</span> <span class="o">+</span> <span class="mi">2</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">x_obs_sorted</span> <span class="o">-</span> <span class="n">tau_val</span><span class="p">)</span>
+        
+        <span class="n">sse</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">y_pred</span> <span class="o">=</span> <span class="n">_solve_linear_regression_numba</span><span class="p">(</span><span class="n">X_design</span><span class="p">,</span> <span class="n">y_obs_sorted</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">sse</span> <span class="o">&lt;</span> <span class="n">min_sse_val</span><span class="p">:</span>
+            <span class="n">min_sse_val</span><span class="p">,</span> <span class="n">best_taus_list</span><span class="p">,</span> <span class="n">best_y_pred</span> <span class="o">=</span> <span class="n">sse</span><span class="p">,</span> <span class="n">current_taus</span><span class="p">,</span> <span class="n">y_pred</span>
+            
+    <span class="k">if</span> <span class="n">best_taus_list</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span> <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;best_taus&#39;</span><span class="p">:</span> <span class="n">best_taus_list</span><span class="p">,</span> <span class="s1">&#39;min_sse&#39;</span><span class="p">:</span> <span class="n">min_sse_val</span><span class="p">,</span> <span class="s1">&#39;y_pred&#39;</span><span class="p">:</span> <span class="n">best_y_pred</span><span class="p">}</span>
+
+<span class="c1"># =============================================================================</span>
+<span class="c1"># CALCULATION ENGINE #2: SKLEARN-BASED VERSION (NO NUMBA)</span>
+<span class="c1"># =============================================================================</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_fit_model_sklearn</span><span class="p">(</span><span class="n">x_obs_sorted</span><span class="p">,</span> <span class="n">y_obs_sorted</span><span class="p">,</span> <span class="n">num_crossovers</span><span class="p">,</span> <span class="n">min_points_per_segment</span><span class="o">=</span><span class="mi">3</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Fits piecewise regression models using the Scikit-learn engine.&quot;&quot;&quot;</span>
+    <span class="n">n_points</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">x_obs_sorted</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">num_crossovers</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">model</span> <span class="o">=</span> <span class="n">LinearRegression</span><span class="p">()</span>
+        <span class="n">x_reshaped</span> <span class="o">=</span> <span class="n">x_obs_sorted</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">x_reshaped</span><span class="p">,</span> <span class="n">y_obs_sorted</span><span class="p">)</span>
+        <span class="n">y_pred</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">x_reshaped</span><span class="p">)</span>
+        <span class="n">sse</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">((</span><span class="n">y_obs_sorted</span> <span class="o">-</span> <span class="n">y_pred</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;best_taus&#39;</span><span class="p">:</span> <span class="p">[],</span> <span class="s1">&#39;min_sse&#39;</span><span class="p">:</span> <span class="n">sse</span><span class="p">,</span> <span class="s1">&#39;y_pred&#39;</span><span class="p">:</span> <span class="n">y_pred</span><span class="p">}</span>
+    
+    <span class="c1"># Validations (identical to Numba version)</span>
+    <span class="k">if</span> <span class="n">n_points</span> <span class="o">&lt;</span> <span class="n">min_points_per_segment</span> <span class="o">*</span> <span class="p">(</span><span class="n">num_crossovers</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span> <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">unique_x_values</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">unique</span><span class="p">(</span><span class="n">x_obs_sorted</span><span class="p">)</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">unique_x_values</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">num_crossovers</span> <span class="o">+</span> <span class="mi">2</span><span class="p">:</span> <span class="k">return</span> <span class="kc">None</span>
+    <span class="n">potential_tau_values</span> <span class="o">=</span> <span class="n">unique_x_values</span><span class="p">[</span><span class="mi">1</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">potential_tau_values</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">num_crossovers</span><span class="p">:</span> <span class="k">return</span> <span class="kc">None</span>
+    
+    <span class="n">min_sse_val</span><span class="p">,</span> <span class="n">best_taus_list</span><span class="p">,</span> <span class="n">best_y_pred</span> <span class="o">=</span> <span class="nb">float</span><span class="p">(</span><span class="s1">&#39;inf&#39;</span><span class="p">),</span> <span class="kc">None</span><span class="p">,</span> <span class="kc">None</span>
+    
+    <span class="k">for</span> <span class="n">current_taus_combination</span> <span class="ow">in</span> <span class="n">itertools</span><span class="o">.</span><span class="n">combinations</span><span class="p">(</span><span class="n">potential_tau_values</span><span class="p">,</span> <span class="n">num_crossovers</span><span class="p">):</span>
+        <span class="n">current_taus</span> <span class="o">=</span> <span class="nb">sorted</span><span class="p">(</span><span class="nb">list</span><span class="p">(</span><span class="n">current_taus_combination</span><span class="p">))</span>
+        
+        <span class="c1"># Segmentation validation (identical to Numba version)</span>
+        <span class="n">valid_segmentation</span> <span class="o">=</span> <span class="kc">True</span>
+        <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">x_obs_sorted</span> <span class="o">&lt;=</span> <span class="n">current_taus</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="o">&lt;</span> <span class="n">min_points_per_segment</span><span class="p">:</span> <span class="n">valid_segmentation</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="n">valid_segmentation</span><span class="p">:</span>
+            <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_crossovers</span> <span class="o">-</span> <span class="mi">1</span><span class="p">):</span>
+                <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">((</span><span class="n">x_obs_sorted</span> <span class="o">&gt;</span> <span class="n">current_taus</span><span class="p">[</span><span class="n">i</span><span class="p">])</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">x_obs_sorted</span> <span class="o">&lt;=</span> <span class="n">current_taus</span><span class="p">[</span><span class="n">i</span><span class="o">+</span><span class="mi">1</span><span class="p">]))</span> <span class="o">&lt;</span> <span class="n">min_points_per_segment</span><span class="p">:</span>
+                    <span class="n">valid_segmentation</span> <span class="o">=</span> <span class="kc">False</span><span class="p">;</span> <span class="k">break</span>
+        <span class="k">if</span> <span class="n">valid_segmentation</span> <span class="ow">and</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">x_obs_sorted</span> <span class="o">&gt;</span> <span class="n">current_taus</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">])</span> <span class="o">&lt;</span> <span class="n">min_points_per_segment</span><span class="p">:</span> <span class="n">valid_segmentation</span> <span class="o">=</span> <span class="kc">False</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">valid_segmentation</span><span class="p">:</span> <span class="k">continue</span>
+
+        <span class="n">X_design_list</span> <span class="o">=</span> <span class="p">[</span><span class="n">x_obs_sorted</span><span class="p">]</span>
+        <span class="k">for</span> <span class="n">tau_val</span> <span class="ow">in</span> <span class="n">current_taus</span><span class="p">:</span>
+            <span class="n">X_design_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">maximum</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">x_obs_sorted</span> <span class="o">-</span> <span class="n">tau_val</span><span class="p">))</span>
+        <span class="n">X_design</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">(</span><span class="n">X_design_list</span><span class="p">)</span><span class="o">.</span><span class="n">T</span>
+        
+        <span class="n">model</span> <span class="o">=</span> <span class="n">LinearRegression</span><span class="p">()</span>
+        <span class="n">model</span><span class="o">.</span><span class="n">fit</span><span class="p">(</span><span class="n">X_design</span><span class="p">,</span> <span class="n">y_obs_sorted</span><span class="p">)</span>
+        <span class="n">y_pred</span> <span class="o">=</span> <span class="n">model</span><span class="o">.</span><span class="n">predict</span><span class="p">(</span><span class="n">X_design</span><span class="p">)</span>
+        <span class="n">sse</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">((</span><span class="n">y_obs_sorted</span> <span class="o">-</span> <span class="n">y_pred</span><span class="p">)</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+        
+        <span class="k">if</span> <span class="n">sse</span> <span class="o">&lt;</span> <span class="n">min_sse_val</span><span class="p">:</span>
+            <span class="n">min_sse_val</span><span class="p">,</span> <span class="n">best_taus_list</span><span class="p">,</span> <span class="n">best_y_pred</span> <span class="o">=</span> <span class="n">sse</span><span class="p">,</span> <span class="n">current_taus</span><span class="p">,</span> <span class="n">y_pred</span>
+            
+    <span class="k">if</span> <span class="n">best_taus_list</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span> <span class="k">return</span> <span class="kc">None</span>
+    <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;best_taus&#39;</span><span class="p">:</span> <span class="n">best_taus_list</span><span class="p">,</span> <span class="s1">&#39;min_sse&#39;</span><span class="p">:</span> <span class="n">min_sse_val</span><span class="p">,</span> <span class="s1">&#39;y_pred&#39;</span><span class="p">:</span> <span class="n">best_y_pred</span><span class="p">}</span>
+
+<span class="c1"># =============================================================================</span>
+<span class="c1"># PERMUTATION AND SEARCH LOGIC (ENGINE-AGNOSTIC)</span>
+<span class="c1"># =============================================================================</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_process_single_permutation</span><span class="p">(</span><span class="n">perm_id</span><span class="p">,</span> <span class="n">residuals_k0</span><span class="p">,</span> <span class="n">y_fitted_k0</span><span class="p">,</span> <span class="n">x_sorted</span><span class="p">,</span> <span class="n">k0</span><span class="p">,</span> <span class="n">k1</span><span class="p">,</span> <span class="n">min_points</span><span class="p">,</span> <span class="n">fit_function</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Processes a single permutation using the provided fitting function.&quot;&quot;&quot;</span>
+    <span class="n">y_permuted</span> <span class="o">=</span> <span class="n">y_fitted_k0</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">permutation</span><span class="p">(</span><span class="n">residuals_k0</span><span class="p">)</span>
+    
+    <span class="n">results_k0_perm</span> <span class="o">=</span> <span class="n">fit_function</span><span class="p">(</span><span class="n">x_sorted</span><span class="p">,</span> <span class="n">y_permuted</span><span class="p">,</span> <span class="n">k0</span><span class="p">,</span> <span class="n">min_points</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">results_k0_perm</span><span class="p">:</span> <span class="k">return</span> <span class="kc">None</span>
+    
+    <span class="n">results_k1_perm</span> <span class="o">=</span> <span class="n">fit_function</span><span class="p">(</span><span class="n">x_sorted</span><span class="p">,</span> <span class="n">y_permuted</span><span class="p">,</span> <span class="n">k1</span><span class="p">,</span> <span class="n">min_points</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">results_k1_perm</span><span class="p">:</span> <span class="k">return</span> <span class="kc">None</span>
+    
+    <span class="n">sse_k0_perm</span><span class="p">,</span> <span class="n">sse_k1_perm</span> <span class="o">=</span> <span class="n">results_k0_perm</span><span class="p">[</span><span class="s1">&#39;min_sse&#39;</span><span class="p">],</span> <span class="n">results_k1_perm</span><span class="p">[</span><span class="s1">&#39;min_sse&#39;</span><span class="p">]</span>
+    
+    <span class="k">return</span> <span class="p">(</span><span class="n">sse_k0_perm</span> <span class="o">/</span> <span class="n">sse_k1_perm</span><span class="p">)</span> <span class="k">if</span> <span class="n">sse_k1_perm</span> <span class="o">!=</span> <span class="mi">0</span> <span class="k">else</span> <span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="s1">&#39;inf&#39;</span><span class="p">)</span> <span class="k">if</span> <span class="n">sse_k0_perm</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mf">1.0</span><span class="p">)</span>
+
+
+<div class="viewcode-block" id="perform_permutation_test_mp">
+<a class="viewcode-back" href="../../api.html#mftoolkit.crossovers.perform_permutation_test_mp">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">perform_permutation_test_mp</span><span class="p">(</span><span class="n">x_obs_sorted</span><span class="p">,</span> <span class="n">y_obs_sorted</span><span class="p">,</span> <span class="n">k0</span><span class="p">,</span> <span class="n">k1</span><span class="p">,</span> <span class="n">fit_cache</span><span class="p">,</span> <span class="n">fit_function</span><span class="p">,</span> 
+                                <span class="n">num_permutations</span><span class="p">,</span> <span class="n">min_points_per_segment</span><span class="p">,</span> <span class="n">significance_level</span><span class="p">,</span> <span class="n">n_jobs</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Performs the permutation test, dispatching to the correct fitting engine.&quot;&quot;&quot;</span>
+    
+    <span class="c1"># Fit models to original data using the selected fit function</span>
+    <span class="n">cache_key_k0</span> <span class="o">=</span> <span class="p">(</span><span class="n">k0</span><span class="p">,</span> <span class="n">min_points_per_segment</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">cache_key_k0</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">fit_cache</span><span class="p">:</span>
+        <span class="n">fit_cache</span><span class="p">[</span><span class="n">cache_key_k0</span><span class="p">]</span> <span class="o">=</span> <span class="n">fit_function</span><span class="p">(</span><span class="n">x_obs_sorted</span><span class="p">,</span> <span class="n">y_obs_sorted</span><span class="p">,</span> <span class="n">k0</span><span class="p">,</span> <span class="n">min_points_per_segment</span><span class="p">)</span>
+    <span class="n">results_k0_obs</span> <span class="o">=</span> <span class="n">fit_cache</span><span class="p">[</span><span class="n">cache_key_k0</span><span class="p">]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">results_k0_obs</span><span class="p">:</span> <span class="k">return</span> <span class="kc">None</span>
+
+    <span class="n">cache_key_k1</span> <span class="o">=</span> <span class="p">(</span><span class="n">k1</span><span class="p">,</span> <span class="n">min_points_per_segment</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">cache_key_k1</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">fit_cache</span><span class="p">:</span>
+        <span class="n">fit_cache</span><span class="p">[</span><span class="n">cache_key_k1</span><span class="p">]</span> <span class="o">=</span> <span class="n">fit_function</span><span class="p">(</span><span class="n">x_obs_sorted</span><span class="p">,</span> <span class="n">y_obs_sorted</span><span class="p">,</span> <span class="n">k1</span><span class="p">,</span> <span class="n">min_points_per_segment</span><span class="p">)</span>
+    <span class="n">results_k1_obs</span> <span class="o">=</span> <span class="n">fit_cache</span><span class="p">[</span><span class="n">cache_key_k1</span><span class="p">]</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">results_k1_obs</span><span class="p">:</span> <span class="k">return</span> <span class="kc">None</span>
+    
+    <span class="n">sse_k0_obs</span><span class="p">,</span> <span class="n">sse_k1_obs</span> <span class="o">=</span> <span class="n">results_k0_obs</span><span class="p">[</span><span class="s1">&#39;min_sse&#39;</span><span class="p">],</span> <span class="n">results_k1_obs</span><span class="p">[</span><span class="s1">&#39;min_sse&#39;</span><span class="p">]</span>
+    <span class="n">y_fitted_k0_obs</span> <span class="o">=</span> <span class="n">results_k0_obs</span><span class="p">[</span><span class="s1">&#39;y_pred&#39;</span><span class="p">]</span>
+    <span class="n">residuals_k0_obs</span> <span class="o">=</span> <span class="n">y_obs_sorted</span> <span class="o">-</span> <span class="n">y_fitted_k0_obs</span>
+    
+    <span class="n">t_observed</span> <span class="o">=</span> <span class="p">(</span><span class="n">sse_k0_obs</span> <span class="o">/</span> <span class="n">sse_k1_obs</span><span class="p">)</span> <span class="k">if</span> <span class="n">sse_k1_obs</span> <span class="o">!=</span> <span class="mi">0</span> <span class="k">else</span> <span class="p">(</span><span class="nb">float</span><span class="p">(</span><span class="s1">&#39;inf&#39;</span><span class="p">)</span> <span class="k">if</span> <span class="n">sse_k0_obs</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mf">1.0</span><span class="p">)</span>
+    
+    <span class="n">starmap_args</span> <span class="o">=</span> <span class="p">[(</span><span class="n">i</span><span class="p">,</span> <span class="n">residuals_k0_obs</span><span class="p">,</span> <span class="n">y_fitted_k0_obs</span><span class="p">,</span> <span class="n">x_obs_sorted</span><span class="p">,</span> <span class="n">k0</span><span class="p">,</span> <span class="n">k1</span><span class="p">,</span> <span class="n">min_points_per_segment</span><span class="p">,</span> <span class="n">fit_function</span><span class="p">)</span> <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_permutations</span><span class="p">)]</span>
+    
+    <span class="n">num_cores</span> <span class="o">=</span> <span class="n">os</span><span class="o">.</span><span class="n">cpu_count</span><span class="p">()</span> <span class="k">if</span> <span class="n">n_jobs</span> <span class="o">==</span> <span class="o">-</span><span class="mi">1</span> <span class="k">else</span> <span class="n">n_jobs</span>
+    <span class="k">if</span> <span class="n">num_cores</span> <span class="o">&gt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">with</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Pool</span><span class="p">(</span><span class="n">processes</span><span class="o">=</span><span class="n">num_cores</span><span class="p">)</span> <span class="k">as</span> <span class="n">pool</span><span class="p">:</span>
+            <span class="n">perm_results</span> <span class="o">=</span> <span class="n">pool</span><span class="o">.</span><span class="n">starmap</span><span class="p">(</span><span class="n">_process_single_permutation</span><span class="p">,</span> <span class="n">starmap_args</span><span class="p">)</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">perm_results</span> <span class="o">=</span> <span class="p">[</span><span class="n">_process_single_permutation</span><span class="p">(</span><span class="o">*</span><span class="n">args</span><span class="p">)</span> <span class="k">for</span> <span class="n">args</span> <span class="ow">in</span> <span class="n">starmap_args</span><span class="p">]</span>
+            
+    <span class="n">t_permuted_values</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">res</span> <span class="k">for</span> <span class="n">res</span> <span class="ow">in</span> <span class="n">perm_results</span> <span class="k">if</span> <span class="n">res</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">])</span>
+    <span class="n">p_value</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">t_permuted_values</span> <span class="o">&gt;=</span> <span class="n">t_observed</span><span class="p">)</span> <span class="o">/</span> <span class="nb">len</span><span class="p">(</span><span class="n">t_permuted_values</span><span class="p">)</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">t_permuted_values</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mf">1.0</span>
+    
+    <span class="k">return</span> <span class="p">{</span><span class="s1">&#39;reject_h0&#39;</span><span class="p">:</span> <span class="n">p_value</span> <span class="o">&lt;</span> <span class="n">significance_level</span><span class="p">,</span> <span class="s1">&#39;p_value&#39;</span><span class="p">:</span> <span class="n">p_value</span><span class="p">}</span></div>
+
+
+<span class="c1"># =============================================================================</span>
+<span class="c1"># MAIN (PUBLIC) FUNCTION</span>
+<span class="c1"># =============================================================================</span>
+
+<div class="viewcode-block" id="SPIC">
+<a class="viewcode-back" href="../../api.html#mftoolkit.crossovers.SPIC">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">SPIC</span><span class="p">(</span><span class="n">x_obs</span><span class="p">,</span> <span class="n">y_obs</span><span class="p">,</span> <span class="n">max_k_to_test</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">num_permutations</span><span class="o">=</span><span class="mi">200</span><span class="p">,</span> 
+                         <span class="n">min_points_per_segment</span><span class="o">=</span><span class="mi">3</span><span class="p">,</span> <span class="n">significance_level</span><span class="o">=</span><span class="mf">0.05</span><span class="p">,</span> 
+                         <span class="n">n_jobs</span><span class="o">=-</span><span class="mi">1</span><span class="p">,</span> <span class="n">use_numba</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Finds the best number of crossovers (K) using a sequential permutation test.</span>
+<span class="sd">    SPIC: Sequential Permutation for Identifying Crossovers. </span>
+<span class="sd">    Allows selecting between a Numba-optimized engine or a Scikit-learn based one.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">    -----------</span>
+<span class="sd">    x_obs, y_obs : array_like</span>
+<span class="sd">        The observed independent and dependent variables.</span>
+<span class="sd">    max_k_to_test : int, optional</span>
+<span class="sd">        The maximum number of crossovers (K) to test for. Default is 3.</span>
+<span class="sd">    num_permutations : int, optional</span>
+<span class="sd">        Number of permutations for the significance test. Default is 200.</span>
+<span class="sd">    min_points_per_segment : int, optional</span>
+<span class="sd">        Minimum number of data points required in each linear segment. Default is 3.</span>
+<span class="sd">    significance_level : float, optional</span>
+<span class="sd">        The alpha level for the permutation test. Default is 0.05.</span>
+<span class="sd">    n_jobs : int, optional</span>
+<span class="sd">        Number of CPU cores to use for parallel permutations. -1 means all available cores. Default is -1.</span>
+<span class="sd">    use_numba : bool, optional</span>
+<span class="sd">        If True (default), tries to use the Numba-optimized engine. If Numba is not</span>
+<span class="sd">        available, it will automatically switch to False.</span>
+<span class="sd">        If False, uses the Scikit-learn based engine.</span>
+<span class="sd">    </span>
+<span class="sd">    Returns:</span>
+<span class="sd">    --------</span>
+<span class="sd">    list</span>
+<span class="sd">        A list of the indices (in the sorted array) where the crossovers occur.</span>
+<span class="sd">        Returns an empty list if K=0 is the best model.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    This function implements the sequential hypothesis testing method using</span>
+<span class="sd">    permutations, as described in [4], to determine the optimal number of</span>
+<span class="sd">    crossovers in a piecewise linear regression model. The core idea is to</span>
+<span class="sd">    sequentially test a model with K crossovers against a model with K+1</span>
+<span class="sd">    crossovers.</span>
+
+<span class="sd">    References</span>
+<span class="sd">    ----------</span>
+<span class="sd">     [4] Ge, E., &amp; Leung, Y. (2012). Detection of crossover time scales in multifractal detrended fluctuation analysis.</span>
+<span class="sd">      Journal of Geographical Systems, 15(2), 115–147. doi:10.1007/s10109-012-0169-9</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">use_numba</span> <span class="ow">and</span> <span class="ow">not</span> <span class="n">NUMBA_AVAILABLE</span><span class="p">:</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;Numba was requested but is not installed. Falling back to the Scikit-learn engine.&quot;</span><span class="p">)</span>
+        <span class="n">use_numba</span> <span class="o">=</span> <span class="kc">False</span>
+    
+    <span class="n">engine_name</span> <span class="o">=</span> <span class="s2">&quot;Numba&quot;</span> <span class="k">if</span> <span class="n">use_numba</span> <span class="k">else</span> <span class="s2">&quot;Scikit-learn&quot;</span>
+    <span class="n">fit_function</span> <span class="o">=</span> <span class="n">_fit_model_numba</span> <span class="k">if</span> <span class="n">use_numba</span> <span class="k">else</span> <span class="n">_fit_model_sklearn</span>
+    
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Starting SPIC search for best K (up to K=</span><span class="si">{</span><span class="n">max_k_to_test</span><span class="si">}</span><span class="s2">) using engine: </span><span class="si">{</span><span class="n">engine_name</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+    
+    <span class="c1"># Search logic (engine-agnostic)</span>
+    <span class="n">x_obs</span><span class="p">,</span> <span class="n">y_obs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">x_obs</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">y_obs</span><span class="p">)</span>
+    <span class="n">sorted_indices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">x_obs</span><span class="p">)</span>
+    <span class="n">x_obs_sorted</span><span class="p">,</span> <span class="n">y_obs_sorted</span> <span class="o">=</span> <span class="n">x_obs</span><span class="p">[</span><span class="n">sorted_indices</span><span class="p">],</span> <span class="n">y_obs</span><span class="p">[</span><span class="n">sorted_indices</span><span class="p">]</span>
+    
+    <span class="n">fit_cache</span> <span class="o">=</span> <span class="p">{}</span> 
+    <span class="n">best_k</span> <span class="o">=</span> <span class="mi">0</span>
+    
+    <span class="k">for</span> <span class="n">k1_to_test</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="n">max_k_to_test</span> <span class="o">+</span> <span class="mi">1</span><span class="p">):</span>
+        <span class="n">k0_to_test</span> <span class="o">=</span> <span class="n">best_k</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;</span><span class="se">\n</span><span class="s2">Testing if K=</span><span class="si">{</span><span class="n">k1_to_test</span><span class="si">}</span><span class="s2"> is better than K=</span><span class="si">{</span><span class="n">k0_to_test</span><span class="si">}</span><span class="s2">...&quot;</span><span class="p">)</span>
+        <span class="n">test_result</span> <span class="o">=</span> <span class="n">perform_permutation_test_mp</span><span class="p">(</span>
+            <span class="n">x_obs_sorted</span><span class="p">,</span> <span class="n">y_obs_sorted</span><span class="p">,</span> <span class="n">k0_to_test</span><span class="p">,</span> <span class="n">k1_to_test</span><span class="p">,</span> <span class="n">fit_cache</span><span class="p">,</span> <span class="n">fit_function</span><span class="p">,</span>
+            <span class="n">num_permutations</span><span class="p">,</span> <span class="n">min_points_per_segment</span><span class="p">,</span> <span class="n">significance_level</span><span class="p">,</span> <span class="n">n_jobs</span>
+        <span class="p">)</span>
+        <span class="k">if</span> <span class="ow">not</span> <span class="n">test_result</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Test K=</span><span class="si">{</span><span class="n">k0_to_test</span><span class="si">}</span><span class="s2"> vs K=</span><span class="si">{</span><span class="n">k1_to_test</span><span class="si">}</span><span class="s2"> failed. Stopping.&quot;</span><span class="p">)</span>
+            <span class="k">break</span>
+            
+        <span class="k">if</span> <span class="n">test_result</span><span class="p">[</span><span class="s1">&#39;reject_h0&#39;</span><span class="p">]:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Result: K=</span><span class="si">{</span><span class="n">k1_to_test</span><span class="si">}</span><span class="s2"> is significantly better (p=</span><span class="si">{</span><span class="n">test_result</span><span class="p">[</span><span class="s1">&#39;p_value&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">).&quot;</span><span class="p">)</span>
+            <span class="n">best_k</span> <span class="o">=</span> <span class="n">k1_to_test</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Result: K=</span><span class="si">{</span><span class="n">k1_to_test</span><span class="si">}</span><span class="s2"> is NOT better (p=</span><span class="si">{</span><span class="n">test_result</span><span class="p">[</span><span class="s1">&#39;p_value&#39;</span><span class="p">]</span><span class="si">:</span><span class="s2">.4f</span><span class="si">}</span><span class="s2">).&quot;</span><span class="p">)</span>
+            <span class="n">logger</span><span class="o">.</span><span class="n">debug</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Best K determined: K=</span><span class="si">{</span><span class="n">best_k</span><span class="si">}</span><span class="s2">.&quot;</span><span class="p">)</span>
+            <span class="k">break</span>
+            
+    <span class="c1"># Get the final Taus from the best model</span>
+    <span class="n">cache_key_best_k</span> <span class="o">=</span> <span class="p">(</span><span class="n">best_k</span><span class="p">,</span> <span class="n">min_points_per_segment</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">cache_key_best_k</span> <span class="ow">not</span> <span class="ow">in</span> <span class="n">fit_cache</span><span class="p">:</span>
+        <span class="n">fit_cache</span><span class="p">[</span><span class="n">cache_key_best_k</span><span class="p">]</span> <span class="o">=</span> <span class="n">fit_function</span><span class="p">(</span><span class="n">x_obs_sorted</span><span class="p">,</span> <span class="n">y_obs_sorted</span><span class="p">,</span> <span class="n">best_k</span><span class="p">,</span> <span class="n">min_points_per_segment</span><span class="p">)</span>
+    
+    <span class="n">best_model_results</span> <span class="o">=</span> <span class="n">fit_cache</span><span class="o">.</span><span class="n">get</span><span class="p">(</span><span class="n">cache_key_best_k</span><span class="p">)</span>
+    <span class="n">best_k_taus_valores</span> <span class="o">=</span> <span class="n">best_model_results</span><span class="p">[</span><span class="s1">&#39;best_taus&#39;</span><span class="p">]</span> <span class="k">if</span> <span class="n">best_model_results</span> <span class="k">else</span> <span class="p">[]</span>
+
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Search finished. Number of crossovers with most evidence: K = </span><span class="si">{</span><span class="n">best_k</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="n">best_k_taus_valores</span><span class="p">:</span>
+        <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="s2">&quot;Crossovers (x values): None (K=0)&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">[]</span>
+        
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Crossovers (x values): </span><span class="si">{</span><span class="n">best_k_taus_valores</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    <span class="n">crossover_indices</span> <span class="o">=</span> <span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">x_obs_sorted</span> <span class="o">==</span> <span class="n">tau_val</span><span class="p">)[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span> <span class="k">for</span> <span class="n">tau_val</span> <span class="ow">in</span> <span class="n">best_k_taus_valores</span><span class="p">]</span>
+    <span class="n">logger</span><span class="o">.</span><span class="n">info</span><span class="p">(</span><span class="sa">f</span><span class="s2">&quot;Crossover indices (in x_obs_sorted): </span><span class="si">{</span><span class="n">crossover_indices</span><span class="si">}</span><span class="s2">&quot;</span><span class="p">)</span>
+    
+    <span class="k">return</span> <span class="n">crossover_indices</span></div>
+
+
+<span class="c1">################################################################################</span>
+<span class="c1">############################ CDVA Method  ######################################</span>
+<span class="c1">################################################################################</span>
+
+<span class="c1"># =============================================================================</span>
+<span class="c1"># CALCULATION ENGINE #1: NUMBA-OPTIMIZED VERSION</span>
+<span class="c1"># =============================================================================</span>
+
+<span class="nd">@njit</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_linear_fit_slope_numba</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">y</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Calculates only the slope of a linear fit y = mx + c.</span>
+<span class="sd">    Optimized for Numba.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">n</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">n</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+    
+    <span class="n">sum_x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">x</span><span class="p">)</span>
+    <span class="n">sum_y</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">y</span><span class="p">)</span>
+    <span class="n">sum_xy</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">x</span> <span class="o">*</span> <span class="n">y</span><span class="p">)</span>
+    <span class="n">sum_x_sq</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sum</span><span class="p">(</span><span class="n">x</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+    
+    <span class="n">denominator</span> <span class="o">=</span> <span class="p">(</span><span class="n">n</span> <span class="o">*</span> <span class="n">sum_x_sq</span> <span class="o">-</span> <span class="n">sum_x</span><span class="o">**</span><span class="mi">2</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">denominator</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="mf">0.0</span> <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">y</span> <span class="o">==</span> <span class="n">y</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span> <span class="k">else</span> <span class="n">np</span><span class="o">.</span><span class="n">inf</span>
+    
+    <span class="n">slope</span> <span class="o">=</span> <span class="p">(</span><span class="n">n</span> <span class="o">*</span> <span class="n">sum_xy</span> <span class="o">-</span> <span class="n">sum_x</span> <span class="o">*</span> <span class="n">sum_y</span><span class="p">)</span> <span class="o">/</span> <span class="n">denominator</span>
+    <span class="k">return</span> <span class="n">slope</span>
+
+<span class="nd">@njit</span><span class="p">(</span><span class="n">parallel</span><span class="o">=</span><span class="kc">True</span><span class="p">)</span>
+<span class="k">def</span><span class="w"> </span><span class="nf">_slope_dif_matrix_numba_internal</span><span class="p">(</span><span class="n">logS_arr</span><span class="p">,</span> <span class="n">logFq_single_q_arr</span><span class="p">,</span> <span class="n">N_s</span><span class="p">,</span> <span class="n">w_min</span><span class="p">,</span> <span class="n">w_arr</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Numba-optimized and internally parallelized version for a single q-moment.</span>
+<span class="sd">    Calculates the slope difference matrix for a single logFq(q) series.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="n">N_w</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">w_arr</span><span class="p">)</span>
+    <span class="n">N_s_B</span> <span class="o">=</span> <span class="n">N_s</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">w_min</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">N_s_B</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="n">N_w</span><span class="p">,</span> <span class="mi">0</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+
+    <span class="n">nu_single_q</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">N_w</span><span class="p">,</span> <span class="n">N_s_B</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">ss</span> <span class="ow">in</span> <span class="n">prange</span><span class="p">(</span><span class="n">N_s_B</span><span class="p">):</span> <span class="c1"># Numba&#39;s prange enables parallelism</span>
+        <span class="n">index_in_logS</span> <span class="o">=</span> <span class="n">ss</span> <span class="o">+</span> <span class="p">(</span><span class="n">w_min</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+        
+        <span class="k">for</span> <span class="n">ww</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N_w</span><span class="p">):</span>
+            <span class="n">window_val</span> <span class="o">=</span> <span class="n">w_arr</span><span class="p">[</span><span class="n">ww</span><span class="p">]</span>
+
+            <span class="c1"># Left-side linear fit</span>
+            <span class="n">start_left</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">index_in_logS</span> <span class="o">-</span> <span class="n">window_val</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="n">x_left</span> <span class="o">=</span> <span class="n">logS_arr</span><span class="p">[</span><span class="n">start_left</span> <span class="p">:</span> <span class="n">index_in_logS</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+            <span class="n">y_left</span> <span class="o">=</span> <span class="n">logFq_single_q_arr</span><span class="p">[</span><span class="n">start_left</span> <span class="p">:</span> <span class="n">index_in_logS</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+            <span class="n">p_left_slope</span> <span class="o">=</span> <span class="n">_linear_fit_slope_numba</span><span class="p">(</span><span class="n">x_left</span><span class="p">,</span> <span class="n">y_left</span><span class="p">)</span>
+
+            <span class="c1"># Right-side linear fit</span>
+            <span class="n">end_right</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">N_s</span><span class="p">,</span> <span class="n">index_in_logS</span> <span class="o">+</span> <span class="n">window_val</span><span class="p">)</span>
+            <span class="n">x_right</span> <span class="o">=</span> <span class="n">logS_arr</span><span class="p">[</span><span class="n">index_in_logS</span> <span class="p">:</span> <span class="n">end_right</span><span class="p">]</span>
+            <span class="n">y_right</span> <span class="o">=</span> <span class="n">logFq_single_q_arr</span><span class="p">[</span><span class="n">index_in_logS</span> <span class="p">:</span> <span class="n">end_right</span><span class="p">]</span>
+            <span class="n">p_right_slope</span> <span class="o">=</span> <span class="n">_linear_fit_slope_numba</span><span class="p">(</span><span class="n">x_right</span><span class="p">,</span> <span class="n">y_right</span><span class="p">)</span>
+            
+            <span class="n">nu_single_q</span><span class="p">[</span><span class="n">ww</span><span class="p">,</span> <span class="n">ss</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">p_left_slope</span> <span class="o">-</span> <span class="n">p_right_slope</span><span class="p">)</span>
+            
+    <span class="k">return</span> <span class="n">nu_single_q</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_slope_dif_matrix_numba</span><span class="p">(</span><span class="n">logS</span><span class="p">,</span> <span class="n">logFq</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">q_column</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Python wrapper that calls the Numba-optimized function for each q.&quot;&quot;&quot;</span>
+    <span class="n">current_logFq</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">logFq</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+    <span class="n">current_q</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">q</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">q_column</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">q_column</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">current_q</span> <span class="o">-</span> <span class="mf">2.0</span><span class="p">))</span>
+        <span class="n">current_logFq</span> <span class="o">=</span> <span class="n">current_logFq</span><span class="p">[:,</span> <span class="n">q_column</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">current_q</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">current_q</span><span class="p">[</span><span class="n">q_column</span><span class="p">]])</span>
+
+    <span class="n">N_q_processed</span> <span class="o">=</span> <span class="n">current_q</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">N_s_val</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">logS</span><span class="p">)</span>
+    <span class="n">w_min</span><span class="p">,</span> <span class="n">w_max_val</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span> <span class="n">N_s_val</span> <span class="o">-</span> <span class="mi">1</span>
+    
+    <span class="k">if</span> <span class="n">w_max_val</span> <span class="o">&lt;</span> <span class="n">w_min</span><span class="p">:</span> <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+    
+    <span class="n">w_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">w_min</span><span class="p">,</span> <span class="n">w_max_val</span> <span class="o">+</span> <span class="mi">1</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">int_</span><span class="p">)</span>
+    <span class="n">N_s_B_len</span> <span class="o">=</span> <span class="n">N_s_val</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">w_min</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">N_s_B_len</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span> <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">w_arr</span><span class="p">),</span> <span class="mi">0</span><span class="p">))</span>
+    
+    <span class="n">all_nu</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">w_arr</span><span class="p">),</span> <span class="n">N_s_B_len</span><span class="p">,</span> <span class="n">N_q_processed</span><span class="p">),</span> <span class="n">dtype</span><span class="o">=</span><span class="n">np</span><span class="o">.</span><span class="n">float64</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">qq</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N_q_processed</span><span class="p">):</span>
+        <span class="n">logFq_single_q</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ascontiguousarray</span><span class="p">(</span><span class="n">current_logFq</span><span class="p">[:,</span> <span class="n">qq</span><span class="p">])</span>
+        <span class="n">all_nu</span><span class="p">[:,</span> <span class="p">:,</span> <span class="n">qq</span><span class="p">]</span> <span class="o">=</span> <span class="n">_slope_dif_matrix_numba_internal</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">logS</span><span class="p">),</span> <span class="n">logFq_single_q</span><span class="p">,</span> <span class="n">N_s_val</span><span class="p">,</span> <span class="n">w_min</span><span class="p">,</span> <span class="n">w_arr</span><span class="p">)</span>
+    
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">nanmean</span><span class="p">(</span><span class="n">all_nu</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+
+<span class="c1"># =============================================================================</span>
+<span class="c1"># CALCULATION ENGINE #2: PLAIN PYTHON/NUMPY VERSION</span>
+<span class="c1"># =============================================================================</span>
+
+<span class="k">def</span><span class="w"> </span><span class="nf">_slope_dif_matrix_plain</span><span class="p">(</span><span class="n">logS</span><span class="p">,</span> <span class="n">logFq</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">q_column</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Calculates the M matrix using plain NumPy without Numba optimization.&quot;&quot;&quot;</span>
+    <span class="n">logS_np</span><span class="p">,</span> <span class="n">logFq_np</span><span class="p">,</span> <span class="n">q_np</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">logS</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">logFq</span><span class="p">),</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">q</span><span class="p">)</span>
+    
+    <span class="k">if</span> <span class="n">method</span> <span class="o">==</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">q_column</span> <span class="ow">is</span> <span class="kc">None</span><span class="p">:</span>
+            <span class="n">q_column</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">argmin</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">q_np</span> <span class="o">-</span> <span class="mf">2.0</span><span class="p">))</span>
+        <span class="n">logFq_np</span> <span class="o">=</span> <span class="n">logFq_np</span><span class="p">[:,</span> <span class="n">q_column</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="o">-</span><span class="mi">1</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+        <span class="n">q_np</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([</span><span class="n">q_np</span><span class="p">[</span><span class="n">q_column</span><span class="p">]])</span>
+    
+    <span class="n">N_q</span><span class="p">,</span> <span class="n">N_s</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">q_np</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">logS_np</span><span class="p">)</span>
+    <span class="n">w_min</span><span class="p">,</span> <span class="n">w_max</span> <span class="o">=</span> <span class="mi">2</span><span class="p">,</span> <span class="n">N_s</span> <span class="o">-</span> <span class="mi">1</span>
+    <span class="k">if</span> <span class="n">w_max</span> <span class="o">&lt;</span> <span class="n">w_min</span><span class="p">:</span> <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="mi">0</span><span class="p">,</span><span class="mi">0</span><span class="p">))</span>
+    
+    <span class="n">w</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">w_min</span><span class="p">,</span> <span class="n">w_max</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">N_w</span> <span class="o">=</span> <span class="nb">len</span><span class="p">(</span><span class="n">w</span><span class="p">)</span>
+    <span class="n">N_s_B</span> <span class="o">=</span> <span class="n">N_s</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="p">(</span><span class="n">w_min</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">N_s_B</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span> <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">empty</span><span class="p">((</span><span class="n">N_w</span><span class="p">,</span> <span class="mi">0</span><span class="p">))</span>
+
+    <span class="n">nu</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">((</span><span class="n">N_w</span><span class="p">,</span> <span class="n">N_s_B</span><span class="p">,</span> <span class="n">N_q</span><span class="p">))</span>
+
+    <span class="k">for</span> <span class="n">qq</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N_q</span><span class="p">):</span>
+        <span class="k">for</span> <span class="n">ss</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N_s_B</span><span class="p">):</span>
+            <span class="n">index</span> <span class="o">=</span> <span class="n">ss</span> <span class="o">+</span> <span class="p">(</span><span class="n">w_min</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span>
+            <span class="k">for</span> <span class="n">ww</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">N_w</span><span class="p">):</span>
+                <span class="n">window</span> <span class="o">=</span> <span class="n">w</span><span class="p">[</span><span class="n">ww</span><span class="p">]</span>
+                
+                <span class="n">start_left</span> <span class="o">=</span> <span class="nb">max</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">index</span> <span class="o">-</span> <span class="n">window</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+                <span class="n">x_left</span> <span class="o">=</span> <span class="n">logS_np</span><span class="p">[</span><span class="n">start_left</span><span class="p">:</span><span class="n">index</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span>
+                <span class="n">y_left</span> <span class="o">=</span> <span class="n">logFq_np</span><span class="p">[</span><span class="n">start_left</span><span class="p">:</span><span class="n">index</span><span class="o">+</span><span class="mi">1</span><span class="p">,</span> <span class="n">qq</span><span class="p">]</span>
+                <span class="n">p_left</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">polyfit</span><span class="p">(</span><span class="n">x_left</span><span class="p">,</span> <span class="n">y_left</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+
+                <span class="n">end_right</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">N_s</span><span class="p">,</span> <span class="n">index</span> <span class="o">+</span> <span class="n">window</span><span class="p">)</span>
+                <span class="n">x_right</span> <span class="o">=</span> <span class="n">logS_np</span><span class="p">[</span><span class="n">index</span><span class="p">:</span><span class="n">end_right</span><span class="p">]</span>
+                <span class="n">y_right</span> <span class="o">=</span> <span class="n">logFq_np</span><span class="p">[</span><span class="n">index</span><span class="p">:</span><span class="n">end_right</span><span class="p">,</span> <span class="n">qq</span><span class="p">]</span>
+                <span class="n">p_right</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">polyfit</span><span class="p">(</span><span class="n">x_right</span><span class="p">,</span> <span class="n">y_right</span><span class="p">,</span> <span class="mi">1</span><span class="p">)</span>
+                
+                <span class="n">nu</span><span class="p">[</span><span class="n">ww</span><span class="p">,</span> <span class="n">ss</span><span class="p">,</span> <span class="n">qq</span><span class="p">]</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">p_left</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">-</span> <span class="n">p_right</span><span class="p">[</span><span class="mi">0</span><span class="p">])</span>
+    
+    <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">nu</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">2</span><span class="p">)</span>
+
+<span class="c1"># =============================================================================</span>
+<span class="c1"># COMMON LOGIC (FIND_CROSSOVER)</span>
+<span class="c1"># =============================================================================</span>
+
+<div class="viewcode-block" id="find_crossover">
+<a class="viewcode-back" href="../../api.html#mftoolkit.crossovers.find_crossover">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">find_crossover</span><span class="p">(</span><span class="n">M</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Finds the crossover in the slope difference matrix M.&quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">M</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="ow">or</span> <span class="n">M</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">M</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">2</span> <span class="ow">or</span> <span class="n">M</span><span class="o">.</span><span class="n">shape</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span> <span class="o">&lt;</span> <span class="mi">2</span><span class="p">:</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;(CDVA/find_crossover): M matrix is empty or too small for analysis.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([])</span>
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">M</span><span class="p">)):</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;(CDVA/find_crossover): M matrix contains only NaNs.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([])</span>
+
+    <span class="c1"># (Using the robust logic from your CDVAp.py)</span>
+    <span class="n">var_col</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nanvar</span><span class="p">(</span><span class="n">M</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">ddof</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="n">var_row</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nanvar</span><span class="p">(</span><span class="n">M</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">ddof</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+
+    <span class="n">dif</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">var_row</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">isfinite</span><span class="p">(</span><span class="n">var_row</span><span class="p">)])</span>
+    <span class="n">index_dif</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">dif</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">i_min</span> <span class="o">=</span> <span class="n">index_dif</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">index_dif</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">0</span>
+    
+    <span class="n">var_row_1</span> <span class="o">=</span> <span class="n">var_row</span><span class="p">[</span><span class="n">i_min</span><span class="p">:]</span>
+    <span class="k">if</span> <span class="n">var_row_1</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span> <span class="ow">or</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">var_row_1</span><span class="p">)):</span> <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([])</span>
+    
+    <span class="n">i_max</span> <span class="o">=</span> <span class="n">i_min</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">nanargmax</span><span class="p">(</span><span class="n">var_row_1</span><span class="p">)</span>
+    <span class="n">range_row_2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">i_max</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">dif_2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">diff</span><span class="p">(</span><span class="n">var_row</span><span class="p">[</span><span class="n">range_row_2</span><span class="p">])</span>
+    <span class="n">index_dif_2</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">dif_2</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">i_cut</span> <span class="o">=</span> <span class="n">index_dif_2</span><span class="p">[</span><span class="o">-</span><span class="mi">1</span><span class="p">]</span> <span class="o">+</span> <span class="mi">1</span> <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">index_dif_2</span><span class="p">)</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="mi">0</span>
+
+    <span class="n">var_col_cut</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nanvar</span><span class="p">(</span><span class="n">M</span><span class="p">[</span><span class="n">i_cut</span><span class="p">:,</span> <span class="p">:],</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">,</span> <span class="n">ddof</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">all</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">var_col_cut</span><span class="p">)):</span> <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="n">i_cut</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([])</span>
+    
+    <span class="n">peaks</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">find_peaks</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">nan_to_num</span><span class="p">(</span><span class="n">var_col_cut</span><span class="p">,</span> <span class="n">nan</span><span class="o">=-</span><span class="n">np</span><span class="o">.</span><span class="n">inf</span><span class="p">))</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">peaks</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span> <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="n">i_cut</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([])</span>
+
+    <span class="n">pks_values</span> <span class="o">=</span> <span class="n">var_col_cut</span><span class="p">[</span><span class="n">peaks</span><span class="p">]</span>
+    <span class="n">valid_peaks</span> <span class="o">=</span> <span class="n">peaks</span><span class="p">[</span><span class="o">~</span><span class="n">np</span><span class="o">.</span><span class="n">isnan</span><span class="p">(</span><span class="n">pks_values</span><span class="p">)]</span>
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">valid_peaks</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span> <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="n">i_cut</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([])</span>
+
+    <span class="n">sorted_peaks</span> <span class="o">=</span> <span class="n">valid_peaks</span><span class="p">[</span><span class="n">np</span><span class="o">.</span><span class="n">argsort</span><span class="p">(</span><span class="n">var_col_cut</span><span class="p">[</span><span class="n">valid_peaks</span><span class="p">])[::</span><span class="o">-</span><span class="mi">1</span><span class="p">]]</span>
+    <span class="n">i1</span> <span class="o">=</span> <span class="n">sorted_peaks</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+    <span class="n">tol</span> <span class="o">=</span> <span class="mi">10</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">nanmin</span><span class="p">(</span><span class="n">var_col_cut</span><span class="p">)</span>
+    
+    <span class="n">valley</span> <span class="o">=</span> <span class="kc">None</span>
+    <span class="k">for</span> <span class="n">peak</span> <span class="ow">in</span> <span class="n">sorted_peaks</span><span class="p">[</span><span class="mi">1</span><span class="p">:]:</span>
+        <span class="n">a</span><span class="p">,</span> <span class="n">b</span> <span class="o">=</span> <span class="nb">min</span><span class="p">(</span><span class="n">peak</span><span class="p">,</span> <span class="n">i1</span><span class="p">),</span> <span class="nb">max</span><span class="p">(</span><span class="n">peak</span><span class="p">,</span> <span class="n">i1</span><span class="p">)</span>
+        <span class="n">segment</span> <span class="o">=</span> <span class="n">var_col_cut</span><span class="p">[</span><span class="n">a</span> <span class="p">:</span> <span class="n">b</span> <span class="o">+</span> <span class="mi">1</span><span class="p">]</span>
+        <span class="n">candidate_valley</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">segment</span> <span class="o">&lt;=</span> <span class="n">tol</span><span class="p">)[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="k">if</span> <span class="n">candidate_valley</span><span class="o">.</span><span class="n">size</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">:</span>
+            <span class="n">valley</span> <span class="o">=</span> <span class="n">candidate_valley</span> <span class="o">+</span> <span class="n">a</span>
+            <span class="k">break</span>
+            
+    <span class="k">if</span> <span class="n">valley</span> <span class="ow">is</span> <span class="kc">None</span> <span class="ow">or</span> <span class="n">valley</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span> <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="n">i_cut</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([])</span>
+    
+    <span class="k">if</span> <span class="n">valley</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="n">index_s_cross</span> <span class="o">=</span> <span class="n">valley</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">slope_dif_mean</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nanmean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">M</span><span class="p">[:,</span> <span class="n">index_s_cross</span> <span class="o">-</span> <span class="mi">1</span><span class="p">]))</span> <span class="k">if</span> <span class="n">index_s_cross</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="k">else</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">M_sel</span> <span class="o">=</span> <span class="n">M</span><span class="p">[</span><span class="n">i_cut</span><span class="p">:,</span> <span class="n">valley</span><span class="p">]</span>
+        <span class="n">col_sums</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nansum</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">M_sel</span><span class="p">),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+        <span class="n">norm_1_idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nanargmax</span><span class="p">(</span><span class="n">col_sums</span><span class="p">)</span>
+        <span class="n">slope_dif_mean</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nanmean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">M_sel</span><span class="p">[:,</span> <span class="n">norm_1_idx</span><span class="p">]))</span>
+        <span class="n">index_s_cross</span> <span class="o">=</span> <span class="n">valley</span><span class="p">[</span><span class="n">norm_1_idx</span><span class="p">]</span>
+        
+    <span class="k">return</span> <span class="n">index_s_cross</span><span class="p">,</span> <span class="n">slope_dif_mean</span><span class="p">,</span> <span class="n">i_cut</span><span class="p">,</span> <span class="n">valley</span></div>
+
+
+<span class="c1"># =============================================================================</span>
+<span class="c1"># MAIN (PUBLIC) FUNCTION WITH ENGINE SELECTOR</span>
+<span class="c1"># =============================================================================</span>
+
+<div class="viewcode-block" id="CDVA">
+<a class="viewcode-back" href="../../api.html#mftoolkit.crossovers.CDVA">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">CDVA</span><span class="p">(</span><span class="n">logS</span><span class="p">,</span> <span class="n">logFq</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">method</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">q_column</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span> <span class="n">use_numba</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Crossover Detection based on Variance of slope Differences (CDV-A).</span>
+
+<span class="sd">    This function implements the CDV-A algorithm [2] to find the most</span>
+<span class="sd">    prominent crossover point in a log-log plot of fluctuation functions</span>
+<span class="sd">    Fq(s) vs. scales s.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    logS : array_like</span>
+<span class="sd">        1D array of the logarithm of the scales.</span>
+<span class="sd">    logFq : array_like</span>
+<span class="sd">        2D array of the logarithm of the fluctuation functions.</span>
+<span class="sd">        Rows correspond to scales, columns to q-moments.</span>
+<span class="sd">    q : array_like</span>
+<span class="sd">        1D array of the q-moments.</span>
+<span class="sd">    method : {1, 2}, optional</span>
+<span class="sd">        Method to use: 1 for averaging over all q-moments, 2 for using</span>
+<span class="sd">        only q=2. Default is 1.</span>
+<span class="sd">    q_column : int, optional</span>
+<span class="sd">        0-based index of the column to use in logFq when method=2.</span>
+<span class="sd">        If None, the column closest to q=2 is found automatically.</span>
+<span class="sd">    use_numba : bool, optional</span>
+<span class="sd">        If True, attempts to use the Numba-optimized engine for speed. </span>
+<span class="sd">        If Numba is not installed, it will fall back to the plain NumPy version.</span>
+<span class="sd">        Defaults to False.</span>
+<span class="sd">    </span>
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    tuple</span>
+<span class="sd">        A tuple containing:</span>
+<span class="sd">        - index_s_cross (int): 0-based index of the crossover in the logS array.</span>
+<span class="sd">        - slope_dif_mean (float): Mean of the slope differences at the crossover.</span>
+<span class="sd">        - i_cut (int): Row index used to trim noise-affected variances.</span>
+<span class="sd">        - valley (ndarray): Array of column indices forming the detected valley.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    The CDV-A method identifies potential crossover regions by analyzing the</span>
+<span class="sd">    variance of the differences between left-side and right-side log-log</span>
+<span class="sd">    slopes, computed across multiple window sizes. This implementation is</span>
+<span class="sd">    based on the description and MATLAB code provided in [3].</span>
+
+<span class="sd">    References</span>
+<span class="sd">    ----------</span>
+<span class="sd">    [3] Moreno-Pulido, S., de la Torre, J.C., Ruiz, P. et al. Crossover</span>
+<span class="sd">        detection based on variances of slope differences for multi-fractal</span>
+<span class="sd">        detrended fluctuation analysis (MF-DFA). Nonlinear Dyn 113, </span>
+<span class="sd">        7425–7457 (2025). https://doi.org/10.1007/s11071-024-10478-1&quot;&quot;&quot;</span>
+    <span class="n">engine_func</span> <span class="o">=</span> <span class="n">_slope_dif_matrix_plain</span>
+    <span class="k">if</span> <span class="n">use_numba</span><span class="p">:</span>
+        <span class="k">if</span> <span class="n">NUMBA_AVAILABLE</span><span class="p">:</span>
+            <span class="n">engine_func</span> <span class="o">=</span> <span class="n">_slope_dif_matrix_numba</span>
+        <span class="k">else</span><span class="p">:</span>
+            <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;Numba was requested but is not installed. Using the plain NumPy version.&quot;</span><span class="p">)</span>
+    
+    <span class="c1"># Calculate the slope difference matrix using the selected engine</span>
+    <span class="n">M</span> <span class="o">=</span> <span class="n">engine_func</span><span class="p">(</span><span class="n">logS</span><span class="p">,</span> <span class="n">logFq</span><span class="p">,</span> <span class="n">q</span><span class="p">,</span> <span class="n">method</span><span class="p">,</span> <span class="n">q_column</span><span class="p">)</span>
+
+    <span class="c1"># Find the crossover (this logic is the same for both)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">M</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">)</span> <span class="ow">or</span> <span class="n">M</span><span class="o">.</span><span class="n">size</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;(CDVA): Calculated M matrix is invalid or empty.&quot;</span><span class="p">)</span>
+        <span class="k">return</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">([])</span>
+        
+    <span class="k">return</span> <span class="n">find_crossover</span><span class="p">(</span><span class="n">M</span><span class="p">)</span></div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">mf-toolkit</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API References</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2025, Nahuel Mendez & Sebastian Jaroszewicz.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>

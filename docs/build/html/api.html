@@ -6,10 +6,11 @@
     <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
 
     <title>API References &#8212; mf-toolkit 0.1.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=61cd365c" />
-    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=12dfc556" />
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
     <script src="_static/documentation_options.js?v=01f34227"></script>
-    <script src="_static/doctools.js?v=9a2dae69"></script>
+    <script src="_static/doctools.js?v=9bcbadda"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -35,17 +36,370 @@
 <section id="api-references">
 <h1>API References<a class="headerlink" href="#api-references" title="Link to this heading">¶</a></h1>
 <p>This is the auto-generated documentation from the docstrings of the code.</p>
-<section id="mfdfa-module">
-<h2>MFDFA module<a class="headerlink" href="#mfdfa-module" title="Link to this heading">¶</a></h2>
+<section id="module-mftoolkit.MFDFA">
+<span id="mfdfa-module"></span><h2>MFDFA module<a class="headerlink" href="#module-mftoolkit.MFDFA" title="Link to this heading">¶</a></h2>
+<p>Created on Wed Jun 18 12:49:42 2025</p>
+<p>&#64;author: Nahuel Mendez &amp; Sebastian Jaroszewicz</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="mftoolkit.MFDFA.mfdfa">
+<span class="sig-prename descclassname"><span class="pre">mftoolkit.MFDFA.</span></span><span class="sig-name descname"><span class="pre">mfdfa</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">q_values</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scales</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_cores</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">segments_from_both_ends</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scale_range_for_hq</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">validate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mftoolkit/MFDFA.html#mfdfa"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mftoolkit.MFDFA.mfdfa" title="Link to this definition">¶</a></dt>
+<dd><p>Performs Multifractal Detrended Fluctuations Analysis (MFDFA) in parallel.</p>
+<section id="parameters">
+<h3>Parameters:<a class="headerlink" href="#parameters" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>data<span class="classifier">array_like</span></dt><dd><p>The time series to analyze (one-dimensional).</p>
+</dd>
+<dt>q_values<span class="classifier">array_like</span></dt><dd><p>The range of q moments for the analysis.</p>
+</dd>
+<dt>scales<span class="classifier">array_like</span></dt><dd><p>The scales (segment lengths) to consider. Must be integers.</p>
+</dd>
+<dt>order<span class="classifier">int, optional</span></dt><dd><p>The order of the polynomial for detrending (default is 1, linear).</p>
+</dd>
+<dt>num_cores<span class="classifier">int, optional</span></dt><dd><p>Number of CPU cores to use. If None, use os.cpu_count().</p>
+</dd>
+<dt>segments_from_both_ends<span class="classifier">bool, optional</span></dt><dd><p>If True, segments are taken from the start and end of the series.
+If False (default) segments are taken only from the start.</p>
+</dd>
+<dt>scale_range_for_hq<span class="classifier">tuple or list, optional</span></dt><dd><p>Tuple (min_s, max_s) defines the scale range to be used to calculate
+the exponent h(q). If None (default), all valid scales are used.</p>
+</dd>
+<dt>validate: bool, optional</dt><dd><p>If True (default), theoretical and concavity masks are applied to validate numerical results
+If False, numerical values are returned without a validation step.</p>
+</dd>
+</dl>
 </section>
-<section id="sources-module">
-<h2>Sources module<a class="headerlink" href="#sources-module" title="Link to this heading">¶</a></h2>
+<section id="return">
+<h3>Return:<a class="headerlink" href="#return" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>q<span class="classifier">ndarray</span></dt><dd><p>q-values or moment exponents</p>
+</dd>
+<dt>h_q<span class="classifier">ndarray</span></dt><dd><p>The generalized Hurst exponent for each value of q.</p>
+</dd>
+<dt>tau_q<span class="classifier">ndarray</span></dt><dd><p>The mass scaling function for each value of q.</p>
+</dd>
+<dt>alpha<span class="classifier">ndarray</span></dt><dd><p>The singularity (or Hölder) exponent.</p>
+</dd>
+<dt>f_alpha<span class="classifier">ndarray</span></dt><dd><p>The singularity spectrum.</p>
+</dd>
+<dt>F_q_s<span class="classifier">ndarray</span></dt><dd><p>The fluctuation function F_q(s) for each q and s..</p>
+</dd>
+</dl>
 </section>
-<section id="crossovers-module">
-<h2>Crossovers module<a class="headerlink" href="#crossovers-module" title="Link to this heading">¶</a></h2>
+</dd></dl>
+
 </section>
-<section id="generation-module">
-<h2>Generation module<a class="headerlink" href="#generation-module" title="Link to this heading">¶</a></h2>
+<section id="module-mftoolkit.mfsources">
+<span id="sources-module"></span><h2>Sources module<a class="headerlink" href="#module-mftoolkit.mfsources" title="Link to this heading">¶</a></h2>
+<p>Created on Fri Jun 27 10:14:32 2025</p>
+<p>&#64;author: Nahuel Mendez &amp; Sebastian Jaroszewicz</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="mftoolkit.mfsources.iaaft_surrogate">
+<span class="sig-prename descclassname"><span class="pre">mftoolkit.mfsources.</span></span><span class="sig-name descname"><span class="pre">iaaft_surrogate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">original_series</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_surrogates</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_iter</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">tol</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1e-08</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_jobs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-1</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mftoolkit/mfsources.html#iaaft_surrogate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mftoolkit.mfsources.iaaft_surrogate" title="Link to this definition">¶</a></dt>
+<dd><p>Generates one or more surrogate time series using the IAAFT algorithm.</p>
+<p>This method creates surrogate series that preserve the power spectrum
+(autocorrelation) and the amplitude distribution of the original series.
+The generation can be run in parallel on multiple CPU cores.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>original_series</strong> (<em>np.ndarray</em>) – The 1D input time series to create surrogates from.</p></li>
+<li><p><strong>num_surrogates</strong> (<em>int</em><em>, </em><em>optional</em>) – The number of surrogate series to generate. Defaults to 1.</p></li>
+<li><p><strong>max_iter</strong> (<em>int</em><em>, </em><em>optional</em>) – Maximum number of iterations for the algorithm per surrogate.
+Defaults to 1000.</p></li>
+<li><p><strong>tol</strong> (<em>float</em><em>, </em><em>optional</em>) – Tolerance for convergence. The iteration for a surrogate stops if
+the relative change in spectrum error is less than this value.
+Defaults to 1e-8.</p></li>
+<li><p><strong>n_jobs</strong> (<em>int</em><em>, </em><em>optional</em>) – The number of CPU cores to use for parallel generation. -1 means
+using all available cores. If set to 1, runs on a single thread.
+Defaults to -1.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p><ul class="simple">
+<li><p>If num_surrogates is 1 (default), returns a single NumPy array.</p></li>
+<li><p>If num_surrogates &gt; 1, returns a list of NumPy arrays.</p></li>
+</ul>
+</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray or list[np.ndarray]</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The Iterative Amplitude Adjusted Fourier Transform (IAAFT) algorithm
+iteratively adjusts the surrogate’s amplitudes and power spectrum to
+match the original series [2]. It is used to test against the null hypothesis
+of a stationary linear stochastic process with a possibly non-Gaussian
+distribution of values. This implementation uses Python’s <cite>multiprocessing</cite>
+module to parallelize the generation of multiple surrogates.</p>
+<p class="rubric">References</p>
+<dl class="simple">
+<dt>[2] Schreiber, T., &amp; Schmitz, A. (2000). Surrogate time series.</dt><dd><p>Physica D: Nonlinear Phenomena, 142(3-4), 346-382.</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mftoolkit.mfsources.shuffle_surrogate">
+<span class="sig-prename descclassname"><span class="pre">mftoolkit.mfsources.</span></span><span class="sig-name descname"><span class="pre">shuffle_surrogate</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">original_series</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">ndarray</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_shuffles</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">100</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">list</span><span class="p"><span class="pre">[</span></span><span class="pre">ndarray</span><span class="p"><span class="pre">]</span></span></span></span><a class="reference internal" href="_modules/mftoolkit/mfsources.html#shuffle_surrogate"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mftoolkit.mfsources.shuffle_surrogate" title="Link to this definition">¶</a></dt>
+<dd><p>Generate surrogate time series by randomly shuffling the original series.</p>
+<p>This method creates surrogate series that have the exact same amplitude
+distribution (histogram) as the original series. However, it destroys all
+temporal structures, including both linear and non-linear correlations,
+by randomly reordering the data points.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>original_series</strong> (<em>array_like</em>) – The 1D input time series to create surrogates from.</p></li>
+<li><p><strong>num_shuffles</strong> (<em>int</em><em>, </em><em>optional</em>) – The number of shuffled surrogate series to generate.
+Defaults to 100.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A single 1D array representing the average of all surrogates.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+</section>
+<section id="module-mftoolkit.crossovers">
+<span id="crossovers-module"></span><h2>Crossovers module<a class="headerlink" href="#module-mftoolkit.crossovers" title="Link to this heading">¶</a></h2>
+<p>Created on Wed Jun 18 12:49:42 2025</p>
+<p>&#64;author: Nahuel Mendez &amp; Sebastian Jaroszewicz</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="mftoolkit.crossovers.CDVA">
+<span class="sig-prename descclassname"><span class="pre">mftoolkit.crossovers.</span></span><span class="sig-name descname"><span class="pre">CDVA</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">logS</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">logFq</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">q</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">method</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">q_column</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_numba</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mftoolkit/crossovers.html#CDVA"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mftoolkit.crossovers.CDVA" title="Link to this definition">¶</a></dt>
+<dd><p>Crossover Detection based on Variance of slope Differences (CDV-A).</p>
+<p>This function implements the CDV-A algorithm [2] to find the most
+prominent crossover point in a log-log plot of fluctuation functions
+Fq(s) vs. scales s.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>logS</strong> (<em>array_like</em>) – 1D array of the logarithm of the scales.</p></li>
+<li><p><strong>logFq</strong> (<em>array_like</em>) – 2D array of the logarithm of the fluctuation functions.
+Rows correspond to scales, columns to q-moments.</p></li>
+<li><p><strong>q</strong> (<em>array_like</em>) – 1D array of the q-moments.</p></li>
+<li><p><strong>method</strong> (<em>{1</em><em>, </em><em>2}</em><em>, </em><em>optional</em>) – Method to use: 1 for averaging over all q-moments, 2 for using
+only q=2. Default is 1.</p></li>
+<li><p><strong>q_column</strong> (<em>int</em><em>, </em><em>optional</em>) – 0-based index of the column to use in logFq when method=2.
+If None, the column closest to q=2 is found automatically.</p></li>
+<li><p><strong>use_numba</strong> (<em>bool</em><em>, </em><em>optional</em>) – If True, attempts to use the Numba-optimized engine for speed.
+If Numba is not installed, it will fall back to the plain NumPy version.
+Defaults to False.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A tuple containing:
+- index_s_cross (int): 0-based index of the crossover in the logS array.
+- slope_dif_mean (float): Mean of the slope differences at the crossover.
+- i_cut (int): Row index used to trim noise-affected variances.
+- valley (ndarray): Array of column indices forming the detected valley.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>tuple</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The CDV-A method identifies potential crossover regions by analyzing the
+variance of the differences between left-side and right-side log-log
+slopes, computed across multiple window sizes. This implementation is
+based on the description and MATLAB code provided in [3].</p>
+<p class="rubric">References</p>
+<dl class="simple">
+<dt>[3] Moreno-Pulido, S., de la Torre, J.C., Ruiz, P. et al. Crossover</dt><dd><p>detection based on variances of slope differences for multi-fractal
+detrended fluctuation analysis (MF-DFA). Nonlinear Dyn 113,
+7425–7457 (2025). <a class="reference external" href="https://doi.org/10.1007/s11071-024-10478-1">https://doi.org/10.1007/s11071-024-10478-1</a></p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mftoolkit.crossovers.SPIC">
+<span class="sig-prename descclassname"><span class="pre">mftoolkit.crossovers.</span></span><span class="sig-name descname"><span class="pre">SPIC</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x_obs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y_obs</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">max_k_to_test</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_permutations</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">200</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_points_per_segment</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">3</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">significance_level</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.05</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_jobs</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">-1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">use_numba</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mftoolkit/crossovers.html#SPIC"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mftoolkit.crossovers.SPIC" title="Link to this definition">¶</a></dt>
+<dd><p>Finds the best number of crossovers (K) using a sequential permutation test.
+SPIC: Sequential Permutation for Identifying Crossovers.
+Allows selecting between a Numba-optimized engine or a Scikit-learn based one.</p>
+<section id="id1">
+<h3>Parameters:<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>x_obs, y_obs<span class="classifier">array_like</span></dt><dd><p>The observed independent and dependent variables.</p>
+</dd>
+<dt>max_k_to_test<span class="classifier">int, optional</span></dt><dd><p>The maximum number of crossovers (K) to test for. Default is 3.</p>
+</dd>
+<dt>num_permutations<span class="classifier">int, optional</span></dt><dd><p>Number of permutations for the significance test. Default is 200.</p>
+</dd>
+<dt>min_points_per_segment<span class="classifier">int, optional</span></dt><dd><p>Minimum number of data points required in each linear segment. Default is 3.</p>
+</dd>
+<dt>significance_level<span class="classifier">float, optional</span></dt><dd><p>The alpha level for the permutation test. Default is 0.05.</p>
+</dd>
+<dt>n_jobs<span class="classifier">int, optional</span></dt><dd><p>Number of CPU cores to use for parallel permutations. -1 means all available cores. Default is -1.</p>
+</dd>
+<dt>use_numba<span class="classifier">bool, optional</span></dt><dd><p>If True (default), tries to use the Numba-optimized engine. If Numba is not
+available, it will automatically switch to False.
+If False, uses the Scikit-learn based engine.</p>
+</dd>
+</dl>
+</section>
+<section id="returns">
+<h3>Returns:<a class="headerlink" href="#returns" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>list</dt><dd><p>A list of the indices (in the sorted array) where the crossovers occur.
+Returns an empty list if K=0 is the best model.</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>This function implements the sequential hypothesis testing method using
+permutations, as described in [4], to determine the optimal number of
+crossovers in a piecewise linear regression model. The core idea is to
+sequentially test a model with K crossovers against a model with K+1
+crossovers.</p>
+<p class="rubric">References</p>
+<dl class="simple">
+<dt>[4] Ge, E., &amp; Leung, Y. (2012). Detection of crossover time scales in multifractal detrended fluctuation analysis.</dt><dd><p>Journal of Geographical Systems, 15(2), 115–147. doi:10.1007/s10109-012-0169-9</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mftoolkit.crossovers.find_crossover">
+<span class="sig-prename descclassname"><span class="pre">mftoolkit.crossovers.</span></span><span class="sig-name descname"><span class="pre">find_crossover</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">M</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mftoolkit/crossovers.html#find_crossover"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mftoolkit.crossovers.find_crossover" title="Link to this definition">¶</a></dt>
+<dd><p>Finds the crossover in the slope difference matrix M.</p>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mftoolkit.crossovers.perform_permutation_test_mp">
+<span class="sig-prename descclassname"><span class="pre">mftoolkit.crossovers.</span></span><span class="sig-name descname"><span class="pre">perform_permutation_test_mp</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">x_obs_sorted</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">y_obs_sorted</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">k1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_cache</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">fit_function</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_permutations</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">min_points_per_segment</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">significance_level</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_jobs</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mftoolkit/crossovers.html#perform_permutation_test_mp"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mftoolkit.crossovers.perform_permutation_test_mp" title="Link to this definition">¶</a></dt>
+<dd><p>Performs the permutation test, dispatching to the correct fitting engine.</p>
+</dd></dl>
+
+</section>
+<section id="module-mftoolkit.mfgeneration">
+<span id="generation-module"></span><h2>Generation module<a class="headerlink" href="#module-mftoolkit.mfgeneration" title="Link to this heading">¶</a></h2>
+<p>Created on Thu Aug 28 12:22:42 2025</p>
+<p>&#64;author: Nahuel Mendez &amp; Sebastian Jaroszewicz</p>
+<dl class="py function">
+<dt class="sig sig-object py" id="mftoolkit.mfgeneration.generate_crossover_series">
+<span class="sig-prename descclassname"><span class="pre">mftoolkit.mfgeneration.</span></span><span class="sig-name descname"><span class="pre">generate_crossover_series</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">N</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">crossover_scale</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sampling_rate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mftoolkit/mfgeneration.html#generate_crossover_series"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mftoolkit.mfgeneration.generate_crossover_series" title="Link to this definition">¶</a></dt>
+<dd><p>Generate time series with DFA crossover behavior using Fourier Filtering Method (FFM).</p>
+<section id="id2">
+<h3>Parameters:<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>N<span class="classifier">int</span></dt><dd><p>Length of time series (recommended: N &gt;= 10^4)</p>
+</dd>
+<dt>alpha1<span class="classifier">float</span></dt><dd><p>Short-term scaling exponent (DFA exponent for s &lt; crossover_scale)</p>
+</dd>
+<dt>alpha2<span class="classifier">float</span></dt><dd><p>Long-term scaling exponent (DFA exponent for s &gt; crossover_scale)</p>
+</dd>
+<dt>crossover_scale<span class="classifier">float</span></dt><dd><p>The temporal scale where transition occurs</p>
+</dd>
+<dt>sampling_rate<span class="classifier">float</span></dt><dd><p>Sampling rate (default: 1.0)</p>
+</dd>
+<dt>seed<span class="classifier">int, optional</span></dt><dd><p>Seed for the random number generator (default: None)</p>
+</dd>
+</dl>
+</section>
+<section id="id3">
+<h3>Returns:<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>time_series<span class="classifier">ndarray</span></dt><dd><p>Generated time series with crossover behavior</p>
+</dd>
+<dt>time<span class="classifier">ndarray</span></dt><dd><p>Time array</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mftoolkit.mfgeneration.generate_fgn">
+<span class="sig-prename descclassname"><span class="pre">mftoolkit.mfgeneration.</span></span><span class="sig-name descname"><span class="pre">generate_fgn</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">H</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_points</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="reference internal" href="_modules/mftoolkit/mfgeneration.html#generate_fgn"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mftoolkit.mfgeneration.generate_fgn" title="Link to this definition">¶</a></dt>
+<dd><p>Generates a time serie of a fractional Gaussian noise (fGn)
+using the Davies-Harte exact method.</p>
+<section id="id4">
+<h3>Parameters:<a class="headerlink" href="#id4" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>H<span class="classifier">float</span></dt><dd><p>Hurst exponent of the serie. Must be in the range (0, 1).</p>
+</dd>
+<dt>n_points<span class="classifier">int</span></dt><dd><p>Length (number of points) of the time series to generate.</p>
+</dd>
+</dl>
+</section>
+<section id="id5">
+<h3>Returns:<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>fgn_series<span class="classifier">np.ndarray</span></dt><dd><p>A 1D NumPy array containing the fGn time serie.</p>
+</dd>
+</dl>
+</section>
+<section id="references">
+<h3>References:<a class="headerlink" href="#references" title="Link to this heading">¶</a></h3>
+<p>[5] Davies, R. B., &amp; Harte, D. S. (1987). Tests for Hurst effect. Biometrika, 74(1), 95-101.</p>
+</section>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mftoolkit.mfgeneration.generate_mf_corr">
+<span class="sig-prename descclassname"><span class="pre">mftoolkit.mfgeneration.</span></span><span class="sig-name descname"><span class="pre">generate_mf_corr</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_points</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">a</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span><span class="w"> </span><span class="o"><span class="pre">=</span></span><span class="w"> </span><span class="default_value"><span class="pre">0.3</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="reference internal" href="_modules/mftoolkit/mfgeneration.html#generate_mf_corr"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mftoolkit.mfgeneration.generate_mf_corr" title="Link to this definition">¶</a></dt>
+<dd><p>Generates a multifractal series with a perfect Gaussian PDF.</p>
+<p>This method disentangles the PDF from the correlation structure. It first
+generates a standard binomial cascade to obtain a multifractal correlation
+structure. It then imposes this structure onto a Gaussian white noise
+series via rank-ordering.</p>
+<p>The final output is a series that retains the intricate, multifractal
+correlation structure of the cascade model while possessing a strictly
+Gaussian PDF.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n_points</strong> (<em>int</em>) – The length of the time series to generate. Must be a positive
+integer and a power of 2.</p></li>
+<li><p><strong>a</strong> (<em>float</em><em>, </em><em>optional</em>) – The multiplier for the binomial cascade, by default 0.3. Must be
+in the range (0, 1). Values closer to 0.5 generate weaker
+multifractality.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>A 1D NumPy array with the correlation structure of a binomial
+cascade but a Gaussian distribution of values.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+</dd></dl>
+
+<dl class="py function">
+<dt class="sig sig-object py" id="mftoolkit.mfgeneration.generate_mf_dist">
+<span class="sig-prename descclassname"><span class="pre">mftoolkit.mfgeneration.</span></span><span class="sig-name descname"><span class="pre">generate_mf_dist</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">n_points</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">H</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">power</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">2.0</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mftoolkit/mfgeneration.html#generate_mf_dist"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mftoolkit.mfgeneration.generate_mf_dist" title="Link to this definition">¶</a></dt>
+<dd><p>Generates a multifractal time series from a probability distribution.</p>
+<p>This function first creates a fractional Gaussian noise (fGn) series
+with long-range correlations defined by the Hurst exponent. Then, it
+applies a non-linear transformation to introduce multifractality.</p>
+<dl class="field-list simple">
+<dt class="field-odd">Parameters<span class="colon">:</span></dt>
+<dd class="field-odd"><ul class="simple">
+<li><p><strong>n_points</strong> (<em>int</em>) – The length of the time series to generate.</p></li>
+<li><p><strong>H</strong> (<em>float</em>) – The Hurst exponent of the underlying correlation structure (0 &lt; H &lt; 1).</p></li>
+<li><p><strong>power</strong> (<em>float</em>) – The exponent for the non-linear transformation. Values &gt; 1
+introduce multifractality.</p></li>
+</ul>
+</dd>
+<dt class="field-even">Returns<span class="colon">:</span></dt>
+<dd class="field-even"><p>The generated 1D multifractal time series.</p>
+</dd>
+<dt class="field-odd">Return type<span class="colon">:</span></dt>
+<dd class="field-odd"><p>np.ndarray</p>
+</dd>
+</dl>
+<p class="rubric">Notes</p>
+<p>The parameter <cite>H</cite> controls the long-range memory (the monofractal
+component), while <cite>power</cite> controls the strength of the multifractality.</p>
+</dd></dl>
+
 </section>
 </section>
 
@@ -54,7 +408,7 @@
           
         </div>
       </div>
-      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
         <div class="sphinxsidebarwrapper">
 <h1 class="logo"><a href="index.html">mf-toolkit</a></h1>
 
@@ -65,14 +419,23 @@
 
 
 
-<h3>Navigation</h3>
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
 <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">API References</a><ul>
-<li class="toctree-l2"><a class="reference internal" href="#mfdfa-module">MFDFA module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#sources-module">Sources module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#crossovers-module">Crossovers module</a></li>
-<li class="toctree-l2"><a class="reference internal" href="#generation-module">Generation module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-mftoolkit.MFDFA">MFDFA module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-mftoolkit.mfsources">Sources module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-mftoolkit.crossovers">Crossovers module</a></li>
+<li class="toctree-l2"><a class="reference internal" href="#module-mftoolkit.mfgeneration">Generation module</a></li>
 </ul>
 </li>
 </ul>
@@ -85,16 +448,6 @@
   </ul></li>
 </ul>
 </div>
-<search id="searchbox" style="display: none" role="search">
-  <h3 id="searchlabel">Quick search</h3>
-    <div class="searchformwrapper">
-    <form class="search" action="search.html" method="get">
-      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
-      <input type="submit" value="Go" />
-    </form>
-    </div>
-</search>
-<script>document.getElementById('searchbox').style.display = "block"</script>
 
 
 
@@ -111,8 +464,8 @@
       &#169;2025, Nahuel Mendez & Sebastian Jaroszewicz.
       
       |
-      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 7.3.7</a>
-      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 0.7.16</a>
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
       
       |
       <a href="_sources/api.rst.txt"

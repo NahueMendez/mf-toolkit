@@ -2,7 +2,7 @@
 #
 import os
 import sys
-sys.path.insert(0, os.path.abspath(r'C:\Users\CENADIF\mf_toolkit'))
+sys.path.insert(0, os.path.abspath(r'G:\PhD\9_mftoolkit_package\mf-toolkit'))
 
 # For the full list of built-in configuration values, see the documentation:
 # https://www.sphinx-doc.org/en/master/usage/configuration.html

@@ -1,0 +1,360 @@
+<!DOCTYPE html>
+
+<html lang="en" data-content_root="../../">
+  <head>
+    <meta charset="utf-8" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+    <title>mftoolkit.mfgeneration &#8212; mf-toolkit 0.1.0 documentation</title>
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=5ecbeea2" />
+    <link rel="stylesheet" type="text/css" href="../../_static/basic.css?v=b08954a9" />
+    <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css?v=27fed22d" />
+    <script src="../../_static/documentation_options.js?v=01f34227"></script>
+    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
+    <link rel="index" title="Index" href="../../genindex.html" />
+    <link rel="search" title="Search" href="../../search.html" />
+   
+  <link rel="stylesheet" href="../../_static/custom.css" type="text/css" />
+  
+
+  
+  
+
+  </head><body>
+  
+
+    <div class="document">
+      <div class="documentwrapper">
+        <div class="bodywrapper">
+          
+
+          <div class="body" role="main">
+            
+  <h1>Source code for mftoolkit.mfgeneration</h1><div class="highlight"><pre>
+<span></span><span class="c1"># -*- coding: utf-8 -*-</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">Created on Thu Aug 28 12:22:42 2025</span>
+
+<span class="sd">@author: Nahuel Mendez &amp; Sebastian Jaroszewicz</span>
+<span class="sd">&quot;&quot;&quot;</span>
+<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span> 
+<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">warning</span>
+<span class="kn">from</span><span class="w"> </span><span class="nn">scipy.fft</span><span class="w"> </span><span class="kn">import</span> <span class="n">fft</span><span class="p">,</span> <span class="n">ifft</span><span class="p">,</span> <span class="n">fftfreq</span>
+
+<div class="viewcode-block" id="generate_fgn">
+<a class="viewcode-back" href="../../api.html#mftoolkit.mfgeneration.generate_fgn">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">generate_fgn</span><span class="p">(</span><span class="n">H</span><span class="p">:</span> <span class="nb">float</span><span class="p">,</span> <span class="n">n_points</span><span class="p">:</span> <span class="nb">int</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Generates a time serie of a fractional Gaussian noise (fGn)</span>
+<span class="sd">    using the Davies-Harte exact method.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">    -----------</span>
+<span class="sd">    H : float</span>
+<span class="sd">        Hurst exponent of the serie. Must be in the range (0, 1).</span>
+<span class="sd">    n_points : int</span>
+<span class="sd">        Length (number of points) of the time series to generate.</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">    --------</span>
+<span class="sd">    fgn_series : np.ndarray</span>
+<span class="sd">        A 1D NumPy array containing the fGn time serie.</span>
+
+<span class="sd">    References:</span>
+<span class="sd">    -----------</span>
+<span class="sd">    [5] Davies, R. B., &amp; Harte, D. S. (1987). Tests for Hurst effect. Biometrika, 74(1), 95-101.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="mi">0</span> <span class="o">&lt;</span> <span class="n">H</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;Hurst exponent must be in range (0, 1).&quot;</span><span class="p">)</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="nb">isinstance</span><span class="p">(</span><span class="n">n_points</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">or</span> <span class="n">n_points</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;n_points must be a positive integer number&quot;</span><span class="p">)</span>
+
+    <span class="c1"># El método de Davies-Harte requiere un grid extendido de tamaño 2*(N-1)</span>
+    <span class="c1"># para la incrustación circulante.</span>
+    <span class="n">N</span> <span class="o">=</span> <span class="n">n_points</span> <span class="o">-</span> <span class="mi">1</span>
+    <span class="n">M</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">N</span>
+
+    <span class="c1"># Calculate ACVF</span>
+    <span class="n">k</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">N</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span>
+    <span class="n">gamma_k</span> <span class="o">=</span> <span class="mf">0.5</span> <span class="o">*</span> <span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">k</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span><span class="o">**</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">H</span><span class="p">)</span> <span class="o">-</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">k</span><span class="p">)</span><span class="o">**</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">H</span><span class="p">)</span> <span class="o">+</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">k</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span><span class="o">**</span><span class="p">(</span><span class="mi">2</span><span class="o">*</span><span class="n">H</span><span class="p">))</span>
+
+    <span class="c1"># First row of circulant matrix</span>
+    <span class="n">circulant_row</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">concatenate</span><span class="p">([</span><span class="n">gamma_k</span><span class="p">,</span> <span class="n">gamma_k</span><span class="p">[</span><span class="n">N</span><span class="o">-</span><span class="mi">1</span><span class="p">:</span><span class="mi">0</span><span class="p">:</span><span class="o">-</span><span class="mi">1</span><span class="p">]])</span>
+
+    <span class="c1"># Eigen values calculation via FFT for circulant_row</span>
+    <span class="n">lambda_val</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">fft</span><span class="p">(</span><span class="n">circulant_row</span><span class="p">)</span><span class="o">.</span><span class="n">real</span>
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">lambda_val</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">):</span>
+        <span class="n">lambda_val</span><span class="p">[</span><span class="n">lambda_val</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="mi">0</span>
+
+    <span class="c1"># Generate complex noise in frequency domain</span>
+    <span class="n">W</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">M</span><span class="p">)</span> <span class="o">+</span> <span class="mi">1</span><span class="n">j</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">normal</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="mi">1</span><span class="p">,</span> <span class="n">M</span><span class="p">)</span>
+
+    <span class="c1"># Adjust power spectrum</span>
+    <span class="n">f_k</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">fft</span><span class="o">.</span><span class="n">fft</span><span class="p">(</span><span class="n">W</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">sqrt</span><span class="p">(</span><span class="n">lambda_val</span> <span class="o">/</span> <span class="p">(</span><span class="mi">2</span> <span class="o">*</span> <span class="n">M</span><span class="p">)))</span>
+
+    <span class="c1"># Take the real-part.</span>
+    <span class="n">fgn_series</span> <span class="o">=</span> <span class="n">f_k</span><span class="o">.</span><span class="n">real</span><span class="p">[:</span><span class="n">N</span><span class="o">+</span><span class="mi">1</span><span class="p">]</span>
+    
+    <span class="k">return</span> <span class="n">fgn_series</span></div>
+
+
+
+<div class="viewcode-block" id="generate_mf_dist">
+<a class="viewcode-back" href="../../api.html#mftoolkit.mfgeneration.generate_mf_dist">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">generate_mf_dist</span> <span class="p">(</span><span class="n">n_points</span><span class="p">,</span><span class="n">H</span><span class="p">:</span><span class="nb">float</span><span class="p">,</span> <span class="n">power</span><span class="o">=</span><span class="mf">2.0</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Generates a multifractal time series from a probability distribution.</span>
+
+<span class="sd">    This function first creates a fractional Gaussian noise (fGn) series</span>
+<span class="sd">    with long-range correlations defined by the Hurst exponent. Then, it</span>
+<span class="sd">    applies a non-linear transformation to introduce multifractality.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    n_points : int</span>
+<span class="sd">        The length of the time series to generate.</span>
+<span class="sd">    H : float</span>
+<span class="sd">        The Hurst exponent of the underlying correlation structure (0 &lt; H &lt; 1).</span>
+<span class="sd">    power : float</span>
+<span class="sd">        The exponent for the non-linear transformation. Values &gt; 1</span>
+<span class="sd">        introduce multifractality.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    np.ndarray</span>
+<span class="sd">        The generated 1D multifractal time series.</span>
+
+<span class="sd">    Notes</span>
+<span class="sd">    -----</span>
+<span class="sd">    The parameter `H` controls the long-range memory (the monofractal</span>
+<span class="sd">    component), while `power` controls the strength of the multifractality.</span>
+
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># 1. Generate a monofractal base with linear correlations (fGn)</span>
+    <span class="n">fgn_base</span> <span class="o">=</span> <span class="n">generate_fgn</span><span class="p">(</span><span class="n">H</span><span class="p">,</span><span class="n">n_points</span><span class="p">)</span>
+
+    <span class="c1"># 2. Apply a non-linear transformation to introduce multifractality.</span>
+    <span class="n">multifractal_series</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">abs</span><span class="p">(</span><span class="n">fgn_base</span><span class="p">)</span><span class="o">**</span><span class="n">power</span>
+
+    <span class="k">return</span> <span class="p">(</span><span class="n">multifractal_series</span> <span class="o">-</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">multifractal_series</span><span class="p">))</span> <span class="o">/</span> <span class="n">np</span><span class="o">.</span><span class="n">std</span><span class="p">(</span><span class="n">multifractal_series</span><span class="p">)</span></div>
+
+
+<div class="viewcode-block" id="generate_mf_corr">
+<a class="viewcode-back" href="../../api.html#mftoolkit.mfgeneration.generate_mf_corr">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">generate_mf_corr</span><span class="p">(</span><span class="n">n_points</span><span class="p">:</span> <span class="nb">int</span><span class="p">,</span> <span class="n">a</span><span class="p">:</span> <span class="nb">float</span> <span class="o">=</span> <span class="mf">0.3</span><span class="p">)</span> <span class="o">-&gt;</span> <span class="n">np</span><span class="o">.</span><span class="n">ndarray</span><span class="p">:</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;Generates a multifractal series with a perfect Gaussian PDF.</span>
+
+<span class="sd">    This method disentangles the PDF from the correlation structure. It first</span>
+<span class="sd">    generates a standard binomial cascade to obtain a multifractal correlation</span>
+<span class="sd">    structure. It then imposes this structure onto a Gaussian white noise</span>
+<span class="sd">    series via rank-ordering.</span>
+
+<span class="sd">    The final output is a series that retains the intricate, multifractal</span>
+<span class="sd">    correlation structure of the cascade model while possessing a strictly</span>
+<span class="sd">    Gaussian PDF.</span>
+
+<span class="sd">    Parameters</span>
+<span class="sd">    ----------</span>
+<span class="sd">    n_points : int</span>
+<span class="sd">        The length of the time series to generate. Must be a positive</span>
+<span class="sd">        integer and a power of 2.</span>
+<span class="sd">    a : float, optional</span>
+<span class="sd">        The multiplier for the binomial cascade, by default 0.3. Must be</span>
+<span class="sd">        in the range (0, 1). Values closer to 0.5 generate weaker</span>
+<span class="sd">        multifractality.</span>
+
+<span class="sd">    Returns</span>
+<span class="sd">    -------</span>
+<span class="sd">    np.ndarray</span>
+<span class="sd">        A 1D NumPy array with the correlation structure of a binomial</span>
+<span class="sd">        cascade but a Gaussian distribution of values.</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># --- 1. Input Parameter Validation ---</span>
+    <span class="k">if</span> <span class="ow">not</span> <span class="p">(</span><span class="nb">isinstance</span><span class="p">(</span><span class="n">n_points</span><span class="p">,</span> <span class="nb">int</span><span class="p">)</span> <span class="ow">and</span> <span class="n">n_points</span> <span class="o">&gt;</span> <span class="mi">0</span> <span class="ow">and</span> <span class="p">(</span><span class="n">n_points</span> <span class="o">&amp;</span> <span class="p">(</span><span class="n">n_points</span> <span class="o">-</span> <span class="mi">1</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)):</span>
+        <span class="c1"># Efficient bitwise check to ensure n_points is a power of 2.</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;n_points must be a positive integer and a power of 2.&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="ow">not</span> <span class="mi">0</span> <span class="o">&lt;</span> <span class="n">a</span> <span class="o">&lt;</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="k">raise</span> <span class="ne">ValueError</span><span class="p">(</span><span class="s2">&quot;The parameter &#39;a&#39; must be in the range (0, 1).&quot;</span><span class="p">)</span>
+
+    <span class="k">if</span> <span class="n">a</span> <span class="o">==</span> <span class="mf">0.5</span><span class="p">:</span>
+        <span class="c1"># Warn the user if they are generating a monofractal series.</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;a=0.5 will generate a monofractal series.&quot;</span><span class="p">,</span> <span class="ne">RuntimeWarning</span><span class="p">)</span>
+
+    <span class="c1"># --- 2. Generate the Canonical Binomial Cascade ---</span>
+    <span class="c1"># This series will have the desired multifractal correlation structure.</span>
+    
+    <span class="n">k</span> <span class="o">=</span> <span class="nb">int</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log2</span><span class="p">(</span><span class="n">n_points</span><span class="p">))</span>
+    <span class="n">cascade_series</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">n_points</span><span class="p">)</span>
+    <span class="n">b</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">-</span> <span class="n">a</span>
+
+    <span class="c1"># Iterate through the k levels of the cascade.</span>
+    <span class="k">for</span> <span class="n">i</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">k</span><span class="p">):</span>
+        <span class="n">level_step</span> <span class="o">=</span> <span class="n">n_points</span> <span class="o">//</span> <span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="n">i</span><span class="p">)</span>
+        <span class="k">for</span> <span class="n">j</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="mi">2</span><span class="o">**</span><span class="n">i</span><span class="p">):</span>
+            <span class="n">start_index</span> <span class="o">=</span> <span class="n">j</span> <span class="o">*</span> <span class="n">level_step</span>
+            <span class="n">mid_index</span> <span class="o">=</span> <span class="n">start_index</span> <span class="o">+</span> <span class="n">level_step</span> <span class="o">//</span> <span class="mi">2</span>
+            
+            <span class="c1"># Apply multiplier &#39;a&#39; to the first half and &#39;b&#39; to the second.</span>
+            <span class="n">cascade_series</span><span class="p">[</span><span class="n">start_index</span><span class="p">:</span><span class="n">mid_index</span><span class="p">]</span> <span class="o">*=</span> <span class="n">a</span>
+            <span class="n">cascade_series</span><span class="p">[</span><span class="n">mid_index</span><span class="p">:</span><span class="n">start_index</span> <span class="o">+</span> <span class="n">level_step</span><span class="p">]</span> <span class="o">*=</span> <span class="n">b</span>
+
+    <span class="c1"># --- 3. Generate Gaussian White Noise ---</span>
+    <span class="c1"># This series has the desired value distribution (PDF), but no correlations.</span>
+    <span class="n">gaussian_series</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">n_points</span><span class="p">)</span>
+
+    <span class="c1"># --- 4. Impose the Correlation Structure onto the Gaussian Values ---</span>
+    
+    <span class="c1"># Get the ranks of the cascade series.</span>
+    <span class="c1"># argsort() returns the indices that would sort the array.</span>
+    <span class="c1"># Applying it twice gives the rank of each element (from 0 to N-1).</span>
+    <span class="n">cascade_ranks</span> <span class="o">=</span> <span class="n">cascade_series</span><span class="o">.</span><span class="n">argsort</span><span class="p">()</span><span class="o">.</span><span class="n">argsort</span><span class="p">()</span>
+    
+    <span class="c1"># Sort the values of the Gaussian series.</span>
+    <span class="n">sorted_gaussian</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">sort</span><span class="p">(</span><span class="n">gaussian_series</span><span class="p">)</span>
+    
+    <span class="c1"># Reorder the Gaussian series to follow the rank pattern of the cascade.</span>
+    <span class="c1"># This is the key step that &quot;imprints&quot; the correlation structure.</span>
+    <span class="n">final_series</span> <span class="o">=</span> <span class="n">sorted_gaussian</span><span class="p">[</span><span class="n">cascade_ranks</span><span class="p">]</span>
+
+    <span class="k">return</span> <span class="n">final_series</span></div>
+
+
+
+<div class="viewcode-block" id="generate_crossover_series">
+<a class="viewcode-back" href="../../api.html#mftoolkit.mfgeneration.generate_crossover_series">[docs]</a>
+<span class="k">def</span><span class="w"> </span><span class="nf">generate_crossover_series</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">alpha1</span><span class="p">,</span> <span class="n">alpha2</span><span class="p">,</span> <span class="n">crossover_scale</span><span class="p">,</span> <span class="n">sampling_rate</span><span class="o">=</span><span class="mf">1.0</span><span class="p">,</span> <span class="n">seed</span><span class="o">=</span><span class="kc">None</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Generate time series with DFA crossover behavior using Fourier Filtering Method (FFM).</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">    -----------</span>
+<span class="sd">    N : int</span>
+<span class="sd">        Length of time series (recommended: N &gt;= 10^4)</span>
+<span class="sd">    alpha1 : float</span>
+<span class="sd">        Short-term scaling exponent (DFA exponent for s &lt; crossover_scale)</span>
+<span class="sd">    alpha2 : float</span>
+<span class="sd">        Long-term scaling exponent (DFA exponent for s &gt; crossover_scale)</span>
+<span class="sd">    crossover_scale : float</span>
+<span class="sd">        The temporal scale where transition occurs</span>
+<span class="sd">    sampling_rate : float</span>
+<span class="sd">        Sampling rate (default: 1.0)</span>
+<span class="sd">    seed : int, optional</span>
+<span class="sd">        Seed for the random number generator (default: None)</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">    --------</span>
+<span class="sd">    time_series : ndarray</span>
+<span class="sd">        Generated time series with crossover behavior</span>
+<span class="sd">    time : ndarray</span>
+<span class="sd">        Time array</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+
+    <span class="c1"># Step 1: Generate base random series</span>
+    <span class="k">if</span> <span class="n">seed</span> <span class="ow">is</span> <span class="ow">not</span> <span class="kc">None</span><span class="p">:</span>
+        <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">seed</span><span class="p">(</span><span class="n">seed</span><span class="p">)</span>
+    <span class="n">random_series</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randn</span><span class="p">(</span><span class="n">N</span><span class="p">)</span>
+
+    <span class="c1"># Step 2: Define crossover parameters</span>
+    <span class="n">fc</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">/</span> <span class="n">crossover_scale</span>  <span class="c1"># Crossover frequency</span>
+
+    <span class="c1"># Convert DFA exponents to power spectral exponents: β = 2α - 1</span>
+    <span class="n">beta1</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">alpha1</span> <span class="o">-</span> <span class="mi">1</span>  <span class="c1"># For high frequencies (short scales)</span>
+    <span class="n">beta2</span> <span class="o">=</span> <span class="mi">2</span> <span class="o">*</span> <span class="n">alpha2</span> <span class="o">-</span> <span class="mi">1</span>  <span class="c1"># For low frequencies (long scales)</span>
+
+    <span class="c1"># Step 3: Construct modified power spectrum</span>
+    <span class="c1"># Get Fourier transform of random series</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">fft</span><span class="p">(</span><span class="n">random_series</span><span class="p">)</span>
+    <span class="n">freqs</span> <span class="o">=</span> <span class="n">fftfreq</span><span class="p">(</span><span class="n">N</span><span class="p">,</span> <span class="n">d</span><span class="o">=</span><span class="mf">1.0</span><span class="o">/</span><span class="n">sampling_rate</span><span class="p">)</span>
+
+    <span class="c1"># Avoid zero frequency (DC component)</span>
+    <span class="n">freqs</span><span class="p">[</span><span class="mi">0</span><span class="p">]</span> <span class="o">=</span> <span class="n">freqs</span><span class="p">[</span><span class="mi">1</span><span class="p">]</span>  <span class="c1"># Set DC to same as first non-zero frequency</span>
+
+    <span class="c1"># Create power spectrum S(f)</span>
+    <span class="n">S</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros_like</span><span class="p">(</span><span class="n">freqs</span><span class="p">,</span> <span class="n">dtype</span><span class="o">=</span><span class="nb">complex</span><span class="p">)</span>
+
+    <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">f</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">freqs</span><span class="p">):</span>
+        <span class="n">abs_f</span> <span class="o">=</span> <span class="nb">abs</span><span class="p">(</span><span class="n">f</span><span class="p">)</span>
+        <span class="k">if</span> <span class="n">abs_f</span> <span class="o">&gt;</span> <span class="n">fc</span><span class="p">:</span>  <span class="c1"># High frequencies, short scales</span>
+            <span class="n">S</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">abs_f</span><span class="o">**</span><span class="p">(</span><span class="o">-</span><span class="n">beta1</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span>  <span class="c1"># Square root because we multiply with X</span>
+        <span class="k">else</span><span class="p">:</span>  <span class="c1"># Low frequencies, long scales</span>
+            <span class="n">S</span><span class="p">[</span><span class="n">i</span><span class="p">]</span> <span class="o">=</span> <span class="n">abs_f</span><span class="o">**</span><span class="p">(</span><span class="o">-</span><span class="n">beta2</span><span class="o">/</span><span class="mi">2</span><span class="p">)</span>
+
+    <span class="c1"># Step 4: Apply spectral modification</span>
+    <span class="c1"># Multiply Fourier transform by square root of desired power spectrum</span>
+    <span class="n">X_modified</span> <span class="o">=</span> <span class="n">X</span> <span class="o">*</span> <span class="n">S</span>
+
+    <span class="c1"># Step 5: Generate time series</span>
+    <span class="c1"># Apply inverse Fourier transform</span>
+    <span class="n">time_series</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">real</span><span class="p">(</span><span class="n">ifft</span><span class="p">(</span><span class="n">X_modified</span><span class="p">))</span>
+
+    <span class="c1"># Create time array</span>
+    <span class="n">time</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">N</span><span class="p">)</span> <span class="o">/</span> <span class="n">sampling_rate</span>
+
+    <span class="k">return</span> <span class="n">time_series</span><span class="p">,</span> <span class="n">time</span></div>
+
+</pre></div>
+
+          </div>
+          
+        </div>
+      </div>
+      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+        <div class="sphinxsidebarwrapper">
+<h1 class="logo"><a href="../../index.html">mf-toolkit</a></h1>
+
+
+
+
+
+
+
+
+
+<search id="searchbox" style="display: none" role="search">
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
+<ul>
+<li class="toctree-l1"><a class="reference internal" href="../../api.html">API References</a></li>
+</ul>
+
+<div class="relations">
+<h3>Related Topics</h3>
+<ul>
+  <li><a href="../../index.html">Documentation overview</a><ul>
+  <li><a href="../index.html">Module code</a><ul>
+  </ul></li>
+  </ul></li>
+</ul>
+</div>
+
+
+
+
+
+
+
+
+        </div>
+      </div>
+      <div class="clearer"></div>
+    </div>
+    <div class="footer">
+      &#169;2025, Nahuel Mendez & Sebastian Jaroszewicz.
+      
+      |
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      
+    </div>
+
+    
+
+    
+  </body>
+</html>
