@@ -121,13 +121,13 @@ if __name__ == '__main__':
     #Again apply valid mask for that q
     valid_F_mask_for_crossover = np.isfinite(current_F_q_s_row_for_crossover) & (current_F_q_s_row_for_crossover > 0)
     
-    # Asegúrate de que haya suficientes puntos válidos para el crossover
+    # Make sure that there is enough values for crossover detection
     if np.sum(valid_F_mask_for_crossover) < 2: # O el mínimo que requiera find_best_crossovers
         print(f"No enought valid points for finding crossovers with q={q_to_analyze_val:.1f}")
     else:
         best_crossover_indices = SPIC(
-            scales[valid_F_mask_for_crossover], 
-            current_F_q_s_row_for_crossover[valid_F_mask_for_crossover],
+            np.log(scales[valid_F_mask_for_crossover]), 
+            np.log(current_F_q_s_row_for_crossover[valid_F_mask_for_crossover]),
             max_k_to_test=3, 
             num_permutations=50, 
             min_points_per_segment=3, 
