@@ -29,8 +29,9 @@ def shuffle_surrogate(original_series: np.ndarray, num_shuffles: int = 100) -> l
 
     Returns
     -------
-    np.ndarray
-        A single 1D array representing the average of all surrogates.
+    np.ndarray or list[np.ndarray]
+        - If num_shuffles is 1 (default), returns a single NumPy array.
+        - If num_shuffles > 1, returns a list of NumPy arrays.
 
     """
     # Ensure the input is a NumPy array for consistent handling
@@ -38,9 +39,7 @@ def shuffle_surrogate(original_series: np.ndarray, num_shuffles: int = 100) -> l
     
     # Use a list comprehension for a concise and efficient loop
     shuffle = [np.random.permutation(series_data) for _ in range(num_shuffles)]
-    #.Calculate the average of all shuffled series
-    average_shuffle = np.mean(shuffle, axis=0)
-    return average_shuffle
+    return shuffle[0] if num_shuffles == 1 else shuffle
 
 
 

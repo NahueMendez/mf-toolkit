@@ -15,92 +15,92 @@ logger = logging.getLogger(__name__)
 # MFDFA (Multifractal Detrended Fluctuation Analysis) - Auxiliary function
 def _process_scale(s_val, profile_data, q_values_arr, poly_order, N_len, process_from_end=False):
     """
-    Processes a single scale 's' for MFDFA calculation.
+    Processes a single scale 's' for MFDFA calculation using vectorized matrix operations.
+
+    This function divides the profile data into segments of length 's_val', performs 
+    polynomial detrending on all segments simultaneously using a least-squares 
+    solution, and computes the fluctuation function F_q for all values in q_values_arr.
 
     Parameters:
     -----------
     s_val : int
-        The current scale to process.
+        The current scale (window size) to process.
     profile_data : ndarray
-        The integrated profile of the time series.
+        The integrated profile of the time series (1D array).
     q_values_arr : ndarray
-        Array of q values.
+        1D array of q exponents to compute the multifractal spectrum.
     poly_order : int
-        Order of the polynomial for detrending.
+        Order of the polynomial for local detrending (e.g., 1 for linear).
     N_len : int
-        Length of the profile (len(profile_data)).
+        Total length of the profile_data.
     process_from_end : bool, optional
-        If True, process segments from start and end.
-        If False (default), processes only segments from the start.
+        If True, processes segments from both the beginning and the end of the 
+        series (2Ns segments total), ensuring no data is lost. Default is False.
 
-    Return:
+    Returns:
     --------
     tuple: (int, ndarray)
-        The processed scale (s_val) and the array F_q for that scale.
-    """
-    if s_val == 0:
+        A tuple containing:
+        - s_val: The processed scale.
+        - F_q_for_this_s: 1D array of shape (len(q_values_arr),) containing 
+          the fluctuation values for each q.
+
+   """
+    if s_val <= poly_order: # Evitamos errores de grado de polinomio
         return s_val, np.zeros(len(q_values_arr))
 
-    num_segments_for_direction = N_len // s_val
+    # 1. Preparar segmentos de forma matricial (Hacia adelante)
+    num_segments = N_len // s_val
+    # Cortamos la serie para que sea divisible por s_val y hacemos reshape
+    # shape: (num_segments, s_val)
+    segments_fwd = profile_data[:num_segments * s_val].reshape(num_segments, s_val)
     
-    segment_variances_list = []
-
-    # Segmentos desde el inicio (siempre se procesan)
-    for v_idx in range(num_segments_for_direction):
-        start_idx = v_idx * s_val
-        end_idx = (v_idx + 1) * s_val
-        if end_idx > N_len: 
-            continue
-        segment = profile_data[start_idx : end_idx]
-        
-        if len(segment) < poly_order + 1: 
-            segment_variances_list.append(0) 
-            continue
-
-        time_axis_segment = np.arange(len(segment))
-        
-        coeffs = np.polyfit(time_axis_segment, segment, poly_order)
-        trend = np.polyval(coeffs, time_axis_segment)
-        detrended_segment = segment - trend
-        
-        segment_variances_list.append(np.mean(detrended_segment**2))
-
+    # 2. Preparar segmentos (Hacia atrás)
     if process_from_end:
-        for v_idx in range(num_segments_for_direction):
-            start_idx = N_len - (v_idx + 1) * s_val
-            end_idx = N_len - v_idx * s_val
-            if start_idx < 0: 
-                continue
-            segment = profile_data[start_idx : end_idx]
+        segments_bwd = profile_data[N_len - num_segments * s_val:].reshape(num_segments, s_val)
+        all_segments = np.vstack([segments_fwd, segments_bwd])
+    else:
+        all_segments = segments_fwd
 
-            if len(segment) < poly_order + 1:
-                segment_variances_list.append(0)
-                continue
-
-            time_axis_segment = np.arange(len(segment)) 
-            
-            coeffs = np.polyfit(time_axis_segment, segment, poly_order)
-            trend = np.polyval(coeffs, time_axis_segment)
-            detrended_segment = segment - trend
-            
-            segment_variances_list.append(np.mean(detrended_segment**2))
+    # 3. DETRENDING VECTORIZADO (El "Modo Rápido")
+    # Creamos una sola matriz de Vandermonde para todos los segmentos
+    x = np.arange(s_val)
+    A = np.vander(x, poly_order + 1) # Matriz base para el ajuste
     
-    segment_variances_arr = np.array(segment_variances_list)
-    segment_variances_arr = segment_variances_arr[segment_variances_arr > 0] 
+    # Resolvemos los coeficientes para TODOS los segmentos a la vez
+    # A @ Coeffs = all_segments.T
+    coeffs, _, _, _ = np.linalg.lstsq(A, all_segments.T, rcond=None)
+    
+    # Calculamos la tendencia y restamos
+    trends = (A @ coeffs).T
+    detrended = all_segments - trends
+    
+    # 4. Cálculo de Varianzas en bloque
+    # axis=1 calcula la media de cada segmento (fila)
+    segment_variances = np.mean(detrended**2, axis=1)
+    
+    # Filtramos varianzas cero para evitar logs de números negativos o ceros
+    segment_variances = segment_variances[segment_variances > 0]
+    
+    if len(segment_variances) == 0:
+        return s_val, np.zeros(len(q_values_arr))
 
+    # 5. Cálculo de F_q (Vectorizado también para q)
     F_q_for_this_s = np.zeros(len(q_values_arr))
-    if len(segment_variances_arr) == 0:
-        return s_val, F_q_for_this_s 
+    
+    # Para q != 0 (Usamos broadcasting de numpy)
+    q_non_zero = q_values_arr != 0
+    q_vals = q_values_arr[q_non_zero][:, np.newaxis] # Preparamos para operar con matrices
+    
+    # F_q = [mean(var^(q/2))]^(1/q)
+    f_q_vals = np.mean(segment_variances**(q_vals / 2.0), axis=1)**(1.0 / q_vals.flatten())
+    F_q_for_this_s[q_non_zero] = f_q_vals
+    
+    # Para q == 0 (Caso especial: Exponente del promedio de logs)
+    if np.any(q_values_arr == 0):
+        q_zero_idx = np.where(q_values_arr == 0)[0][0]
+        F_q_for_this_s[q_zero_idx] = np.exp(0.5 * np.mean(np.log(segment_variances)))
 
-    for i_q_idx, q_val_current in enumerate(q_values_arr):
-        if q_val_current == 0:
-            if np.any(segment_variances_arr <= 0): 
-                 F_q_for_this_s[i_q_idx] = np.nan
-            else:
-                F_q_for_this_s[i_q_idx] = np.exp(0.5 * np.mean(np.log(segment_variances_arr)))
-        else:
-            F_q_for_this_s[i_q_idx] = np.mean(segment_variances_arr**(q_val_current / 2.0))**(1.0 / q_val_current)
-            
     return s_val, F_q_for_this_s
 
 #-----------------------------------------------------------------------------------------------------#
@@ -178,14 +178,20 @@ def mfdfa(data, q_values, scales, order=1, num_cores=None,
     # =========================================================================
     F_q_s_matrix = np.full((len(q_values_arr), len(scales_arr)), np.nan) 
     
-    pool = None
-    try:
-        pool = multiprocessing.Pool(processes=num_cores)
-        results_list = pool.starmap(_process_scale, tasks)
-    finally:
-        if pool:
-            pool.close() 
-            pool.join()  
+    if num_cores == 1:
+        # sequential mode
+        results_list = [_process_scale(*task) for task in tasks]
+        
+    else:
+        # parallel mode
+        pool = None
+        try:
+            pool = multiprocessing.Pool(processes=num_cores)
+            results_list = pool.starmap(_process_scale, tasks)
+        finally:
+            if pool:
+                pool.close() 
+                pool.join()  
 
     scale_to_original_idx = {s_val: i for i, s_val in enumerate(scales_arr)}
     for s_processed, F_q_for_s_processed_arr in results_list:
@@ -348,4 +354,130 @@ def mfdfa(data, q_values, scales, order=1, num_cores=None,
     else:
         #.No validation filters applied 
         return q_values_arr, h_q_arr, tau_q_arr, alpha_arr, f_alpha_arr, F_q_s_matrix
+    
+    
+#--Bootstrapping
+def bootstrap_multifractal_parameters(scales, F_q_s, q_values, n_boot=1000, conf_interval=0.95):
+    """
+    Performs a fully vectorized bootstrap for MFDFA parameters (h, tau, alpha, f_alpha).
+    Uses tensor linear algebra instead of for-loops for resampling.
+
+    Parameters:
+    -----------
+    scales : array (N_scales,)
+        The scales 's' used in the analysis.
+    F_q_s : array (N_q, N_scales)
+        Fluctuation function matrix (pre-filtered for NaNs/Zeros).
+    q_values : array (N_q,)
+        The q exponents.
+    n_boot : int
+        Number of bootstrap iterations.
+    conf_interval : float
+        Confidence level (e.g., 0.95 for 95% CI).
+
+    Returns:
+    --------
+    dict
+        Dictionary with keys 'h', 'tau', 'alpha', 'f_alpha'.
+        Each value is a tuple: (mean, ci_lower, ci_upper, err_low, err_high).
+    """
+    # ---------------------------------------------------------
+    # 1. DATA PREPARATION (Log-Log Domain)
+    # ---------------------------------------------------------
+    scales = np.asarray(scales)
+    log_scales = np.log(scales)
+    log_Fqs = np.log(F_q_s)
+
+    N_q, N_s = log_Fqs.shape
+
+    # ---------------------------------------------------------
+    # 2. BASE OLS FIT & RESIDUALS
+    # ---------------------------------------------------------
+    # Design Matrix X: [log_scales, 1] -> Shape (N_s, 2)
+    X = np.vstack([log_scales, np.ones(N_s)]).T
+
+    # Pre-calculate the OLS Projector: (X^T X)^-1 X^T -> Shape (2, N_s)
+    # This fixed geometry is what makes the bootstrap ultra-fast.
+    try:
+        OLS_projector = np.linalg.inv(X.T @ X) @ X.T
+    except np.linalg.LinAlgError:
+        warnings.warn("Singular matrix in Bootstrap OLS. Returning NaNs.")
+        nan_arr = np.full(N_q, np.nan)
+        return {k: (nan_arr, nan_arr, nan_arr, nan_arr, nan_arr) for k in ['h','tau','alpha','f_alpha']}
+
+    # Vectorized original fit for all q values simultaneously
+    # log_Fqs.T is (N_s, N_q). Resulting Betas are (2, N_q)
+    Betas_orig = OLS_projector @ log_Fqs.T
+
+    # Predictions and Residuals
+    # Y_pred: (N_s, 2) @ (2, N_q) -> (N_s, N_q). Transposed to (N_q, N_s) to match input
+    Y_pred = (X @ Betas_orig).T
+    Residuals = log_Fqs - Y_pred
+
+    # ---------------------------------------------------------
+    # 3. TENSOR BOOTSTRAP (The Vectorized Magic)
+    # ---------------------------------------------------------
+    # Generate random indices for residual resampling with replacement
+    # Shape: (N_s, n_boot)
+    boot_indices = np.random.randint(0, N_s, size=(N_s, n_boot))
+
+    # Construct the Bootstrap Residuals Tensor
+    # Res_boot shape: (N_q, N_s, n_boot) using fancy indexing
+    Res_boot = Residuals[:, boot_indices]
+
+    # Add to original prediction (Broadcasting)
+    # Expand Y_pred to (N_q, N_s, 1) for 3D addition
+    Y_boot = Y_pred[:, :, np.newaxis] + Res_boot
+
+    # ---------------------------------------------------------
+    # 4. MASSIVE OLS SOLUTION
+    # ---------------------------------------------------------
+    # Flatten last two dimensions to solve all bootstraps in one matrix mult
+    Y_boot_flat = Y_boot.transpose(1, 0, 2).reshape(N_s, -1) # Shape (N_s, N_q * n_boot)
+
+    # Single matrix multiplication
+    Betas_boot_flat = OLS_projector @ Y_boot_flat # Shape (2, N_q * n_boot)
+
+    # Reshape back to (2, N_q, n_boot). Row 0 contains h(q) slopes.
+    h_boot_dist = Betas_boot_flat[0, :].reshape(N_q, n_boot)
+
+    # ---------------------------------------------------------
+    # 5. ERROR PROPAGATION (Tau, Alpha, f_Alpha)
+    # ---------------------------------------------------------
+    # A. Tau(q) = q * h(q) - 1
+    q_col = q_values[:, np.newaxis]
+    tau_boot_dist = q_col * h_boot_dist - 1
+
+    # B. Alpha(q) = d(tau)/dq
+    # Compute gradient along axis 0 (q-axis) for each bootstrap column
+    alpha_boot_dist = np.gradient(tau_boot_dist, q_values, axis=0)
+
+    # C. f(alpha) = q * alpha - tau
+    f_alpha_boot_dist = q_col * alpha_boot_dist - tau_boot_dist
+
+    # ---------------------------------------------------------
+    # 6. STATISTICS (Percentiles)
+    # ---------------------------------------------------------
+    alpha_level = 1.0 - conf_interval
+    lp, up = (alpha_level / 2.0) * 100, (1.0 - alpha_level / 2.0) * 100
+
+    results = {}
+
+    def get_stats(dist_matrix):
+        """Helper to compute mean and confidence intervals across bootstrap axis."""
+        mean_val = np.mean(dist_matrix, axis=1)
+        ci_low = np.percentile(dist_matrix, lp, axis=1)
+        ci_high = np.percentile(dist_matrix, up, axis=1)
+        
+        # Absolute Error Bars (distance to mean) for plotting
+        err_low = mean_val - ci_low
+        err_high = ci_high - mean_val
+        return mean_val, ci_low, ci_high, err_low, err_high
+
+    results['h'] = get_stats(h_boot_dist)
+    results['tau'] = get_stats(tau_boot_dist)
+    results['alpha'] = get_stats(alpha_boot_dist)
+    results['f_alpha'] = get_stats(f_alpha_boot_dist)
+
+    return results
     
