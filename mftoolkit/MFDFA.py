@@ -6,7 +6,7 @@ Created on Wed Jun 18 12:49:42 2025
 
 import numpy as np
 from scipy import stats
-import multiprocessing
+from concurrent.futures import ThreadPoolExecutor
 import os
 import warnings,logging
 logger = logging.getLogger(__name__)
@@ -184,14 +184,8 @@ def mfdfa(data, q_values, scales, order=1, num_cores=None,
         
     else:
         # parallel mode
-        pool = None
-        try:
-            pool = multiprocessing.Pool(processes=num_cores)
-            results_list = pool.starmap(_process_scale, tasks)
-        finally:
-            if pool:
-                pool.close() 
-                pool.join()  
+        with ThreadPoolExecutor(max_workers=num_cores) as executor:
+            results_list = list(executor.map(lambda t: _process_scale(*t), tasks))
 
     scale_to_original_idx = {s_val: i for i, s_val in enumerate(scales_arr)}
     for s_processed, F_q_for_s_processed_arr in results_list:

@@ -10,6 +10,7 @@ Created on Wed Jun 18 12:49:42 2025
 
 import numpy as np
 from sklearn.linear_model import LinearRegression
+from concurrent.futures import ThreadPoolExecutor
 import itertools
 import multiprocessing
 import os
@@ -39,22 +40,137 @@ except ImportError:
 # CALCULATION ENGINE #1: NUMBA-OPTIMIZED VERSION
 # =============================================================================
 
-@njit
+
+@njit(nogil=True, cache=True)
 def _solve_linear_regression_numba(X, y):
     """Solves a linear regression using Numba."""
-    # Check if the matrix is singular to avoid errors
     if np.linalg.cond(X.T @ X) > 1e15:
         return np.inf, np.full(X.shape[1], np.nan), np.full(y.shape, np.nan)
-    
     coeffs = np.linalg.solve(X.T @ X, X.T @ y)
     y_pred = X @ coeffs
     sse = np.sum((y - y_pred)**2)
     return sse, coeffs, y_pred
 
+@njit(nogil=True, cache=True)
+def _fit_k1_numba(x, y, potential_taus, min_points):
+    """C-optimized nested loops for K=3 crossovers."""
+    n = len(x)
+    num_taus = len(potential_taus)
+    min_sse = np.inf
+    best_tau = -1.0
+    
+    # Pre-asignamos la memoria de la matriz de diseño UNA sola vez
+    X = np.ones((n, 3))
+    X[:, 1] = x
+
+    for i in range(num_taus):
+        tau = potential_taus[i]
+        
+        # Búsqueda binaria O(1) para validar segmentos
+        idx = np.searchsorted(x, tau, side='right')
+        if idx < min_points or (n - idx) < min_points: 
+            continue
+
+        # Actualizamos la columna del crossover
+        for k in range(n):
+            val = x[k] - tau
+            X[k, 2] = val if val > 0 else 0.0
+
+        sse, _, _ = _solve_linear_regression_numba(X, y)
+        if sse < min_sse:
+            min_sse = sse
+            best_tau = tau
+
+    return min_sse, best_tau
+
+@njit(nogil=True, cache=True)
+def _fit_k2_numba(x, y, potential_taus, min_points):
+    """C-optimized nested loops for K=3 crossovers."""
+    n = len(x)
+    num_taus = len(potential_taus)
+    min_sse = np.inf
+    best_tau1, best_tau2 = -1.0, -1.0
+    
+    X = np.ones((n, 4))
+    X[:, 1] = x
+
+    for i in range(num_taus - 1):
+        tau1 = potential_taus[i]
+        idx1 = np.searchsorted(x, tau1, side='right')
+        if idx1 < min_points: continue
+
+        for j in range(i + 1, num_taus):
+            tau2 = potential_taus[j]
+            idx2 = np.searchsorted(x, tau2, side='right')
+            
+            # Validamos segmento central y final
+            if (idx2 - idx1) < min_points or (n - idx2) < min_points: 
+                continue
+
+            for k in range(n):
+                v1 = x[k] - tau1
+                X[k, 2] = v1 if v1 > 0 else 0.0
+                v2 = x[k] - tau2
+                X[k, 3] = v2 if v2 > 0 else 0.0
+
+            sse, _, _ = _solve_linear_regression_numba(X, y)
+            if sse < min_sse:
+                min_sse = sse
+                best_tau1 = tau1
+                best_tau2 = tau2
+
+    return min_sse, best_tau1, best_tau2
+
+@njit(nogil=True, cache=True)
+def _fit_k3_numba(x, y, potential_taus, min_points):
+    """C-optimized nested loops for K=3 crossovers."""
+    n = len(x)
+    num_taus = len(potential_taus)
+    min_sse = np.inf
+    best_tau1, best_tau2, best_tau3 = -1.0, -1.0, -1.0
+    
+    X = np.ones((n, 5))
+    X[:, 1] = x
+
+    for i in range(num_taus - 2):
+        tau1 = potential_taus[i]
+        idx1 = np.searchsorted(x, tau1, side='right')
+        if idx1 < min_points: continue
+
+        for j in range(i + 1, num_taus - 1):
+            tau2 = potential_taus[j]
+            idx2 = np.searchsorted(x, tau2, side='right')
+            if (idx2 - idx1) < min_points: continue
+
+            for m in range(j + 1, num_taus):
+                tau3 = potential_taus[m]
+                idx3 = np.searchsorted(x, tau3, side='right')
+                
+                if (idx3 - idx2) < min_points or (n - idx3) < min_points: 
+                    continue
+
+                for k in range(n):
+                    v1 = x[k] - tau1
+                    X[k, 2] = v1 if v1 > 0 else 0.0
+                    v2 = x[k] - tau2
+                    X[k, 3] = v2 if v2 > 0 else 0.0
+                    v3 = x[k] - tau3
+                    X[k, 4] = v3 if v3 > 0 else 0.0
+
+                sse, _, _ = _solve_linear_regression_numba(X, y)
+                if sse < min_sse:
+                    min_sse = sse
+                    best_tau1 = tau1
+                    best_tau2 = tau2
+                    best_tau3 = tau3
+
+    return min_sse, best_tau1, best_tau2, best_tau3
+
 def _fit_model_numba(x_obs_sorted, y_obs_sorted, num_crossovers, min_points_per_segment=3):
-    """Fits piecewise regression models using the Numba engine."""
+    """Wrapper that routes to the ultra-fast hardcoded C loops."""
     n_points = len(x_obs_sorted)
 
+    # Caso K = 0
     if num_crossovers == 0:
         X_design = np.ones((n_points, 2))
         X_design[:, 1] = x_obs_sorted
@@ -62,39 +178,36 @@ def _fit_model_numba(x_obs_sorted, y_obs_sorted, num_crossovers, min_points_per_
         if np.isinf(sse): return None
         return {'best_taus': [], 'min_sse': sse, 'y_pred': y_pred}
 
-    # Validations
-    if n_points < min_points_per_segment * (num_crossovers + 1): return None
     unique_x_values = np.unique(x_obs_sorted)
     if len(unique_x_values) < num_crossovers + 2: return None
     potential_tau_values = unique_x_values[1:-1]
     if len(potential_tau_values) < num_crossovers: return None
 
-    min_sse_val, best_taus_list, best_y_pred = float('inf'), None, None
+    # Redireccionamos a los bucles compilados
+    if num_crossovers == 1:
+        min_sse, t1 = _fit_k1_numba(x_obs_sorted, y_obs_sorted, potential_tau_values, min_points_per_segment)
+        best_taus = [t1] if t1 != -1.0 else None
+    elif num_crossovers == 2:
+        min_sse, t1, t2 = _fit_k2_numba(x_obs_sorted, y_obs_sorted, potential_tau_values, min_points_per_segment)
+        best_taus = [t1, t2] if t1 != -1.0 else None
+    elif num_crossovers == 3:
+        min_sse, t1, t2, t3 = _fit_k3_numba(x_obs_sorted, y_obs_sorted, potential_tau_values, min_points_per_segment)
+        best_taus = [t1, t2, t3] if t1 != -1.0 else None
+    else:
+        raise ValueError("Numba optimization for SPIC currently supports max K=3 crossovers.")
 
-    for current_taus_combination in itertools.combinations(potential_tau_values, num_crossovers):
-        current_taus = sorted(list(current_taus_combination))
-        
-        # Segmentation validation
-        valid_segmentation = True
-        if np.sum(x_obs_sorted <= current_taus[0]) < min_points_per_segment: valid_segmentation = False
-        if valid_segmentation:
-            for i in range(num_crossovers - 1):
-                if np.sum((x_obs_sorted > current_taus[i]) & (x_obs_sorted <= current_taus[i+1])) < min_points_per_segment:
-                    valid_segmentation = False; break
-        if valid_segmentation and np.sum(x_obs_sorted > current_taus[-1]) < min_points_per_segment: valid_segmentation = False
-        if not valid_segmentation: continue
+    if best_taus is None: return None
 
-        X_design = np.ones((n_points, num_crossovers + 2))
-        X_design[:, 1] = x_obs_sorted
-        for i, tau_val in enumerate(current_taus):
-            X_design[:, i + 2] = np.maximum(0, x_obs_sorted - tau_val)
-        
-        sse, _, y_pred = _solve_linear_regression_numba(X_design, y_obs_sorted)
-        if sse < min_sse_val:
-            min_sse_val, best_taus_list, best_y_pred = sse, current_taus, y_pred
-            
-    if best_taus_list is None: return None
-    return {'best_taus': best_taus_list, 'min_sse': min_sse_val, 'y_pred': best_y_pred}
+    # TRUCO FINAL: Reconstruimos la curva predicha (y_pred) UNA sola vez para el mejor modelo, 
+    # en lugar de guardar matrices en memoria durante millones de iteraciones.
+    X_design = np.ones((n_points, num_crossovers + 2))
+    X_design[:, 1] = x_obs_sorted
+    for i, tau_val in enumerate(best_taus):
+        X_design[:, i + 2] = np.maximum(0, x_obs_sorted - tau_val)
+    
+    _, _, best_y_pred = _solve_linear_regression_numba(X_design, y_obs_sorted)
+
+    return {'best_taus': best_taus, 'min_sse': min_sse, 'y_pred': best_y_pred}
 
 # =============================================================================
 # CALCULATION ENGINE #2: SKLEARN-BASED VERSION (NO NUMBA)
@@ -262,7 +375,7 @@ def SPIC(x_obs, y_obs, max_k_to_test=3, num_permutations=200,
         use_numba = False
     
     engine_name = "Numba" if use_numba else "Scikit-learn"
-    fit_function = _fit_model_numba if use_numba else _fit_model_sklearn
+    fit_function = _fit_model_numba if use_numba else _fit_model_sklearn    
     
     logger.info(f"Starting SPIC search for best K (up to K={max_k_to_test}) using engine: {engine_name}.")
     
