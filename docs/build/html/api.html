@@ -3,14 +3,13 @@
 <html lang="en" data-content_root="./">
   <head>
     <meta charset="utf-8" />
-    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="viewport" content="width=device-width, initial-scale=1" />
+    <meta name="viewport" content="width=device-width, initial-scale=1.0" /><meta name="generator" content="Docutils 0.18.1: http://docutils.sourceforge.net/" />
 
     <title>API References &#8212; mf-toolkit 0.1.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=5ecbeea2" />
-    <link rel="stylesheet" type="text/css" href="_static/basic.css?v=b08954a9" />
-    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="_static/pygments.css?v=61cd365c" />
+    <link rel="stylesheet" type="text/css" href="_static/alabaster.css?v=12dfc556" />
     <script src="_static/documentation_options.js?v=01f34227"></script>
-    <script src="_static/doctools.js?v=9bcbadda"></script>
+    <script src="_static/doctools.js?v=9a2dae69"></script>
     <script src="_static/sphinx_highlight.js?v=dc90522c"></script>
     <link rel="index" title="Index" href="genindex.html" />
     <link rel="search" title="Search" href="search.html" />
@@ -41,11 +40,41 @@
 <p>Created on Wed Jun 18 12:49:42 2025</p>
 <p>&#64;author: Nahuel Mendez &amp; Sebastian Jaroszewicz</p>
 <dl class="py function">
+<dt class="sig sig-object py" id="mftoolkit.MFDFA.bootstrap_multifractal_parameters">
+<span class="sig-prename descclassname"><span class="pre">mftoolkit.MFDFA.</span></span><span class="sig-name descname"><span class="pre">bootstrap_multifractal_parameters</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">scales</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">F_q_s</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">q_values</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_boot</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1000</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">conf_interval</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">0.95</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mftoolkit/MFDFA.html#bootstrap_multifractal_parameters"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mftoolkit.MFDFA.bootstrap_multifractal_parameters" title="Link to this definition">¶</a></dt>
+<dd><p>Performs a fully vectorized bootstrap for MFDFA parameters (h, tau, alpha, f_alpha).
+Uses tensor linear algebra instead of for-loops for resampling.</p>
+<section id="parameters">
+<h3>Parameters:<a class="headerlink" href="#parameters" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>scales<span class="classifier">array (N_scales,)</span></dt><dd><p>The scales ‘s’ used in the analysis.</p>
+</dd>
+<dt>F_q_s<span class="classifier">array (N_q, N_scales)</span></dt><dd><p>Fluctuation function matrix (pre-filtered for NaNs/Zeros).</p>
+</dd>
+<dt>q_values<span class="classifier">array (N_q,)</span></dt><dd><p>The q exponents.</p>
+</dd>
+<dt>n_boot<span class="classifier">int</span></dt><dd><p>Number of bootstrap iterations.</p>
+</dd>
+<dt>conf_interval<span class="classifier">float</span></dt><dd><p>Confidence level (e.g., 0.95 for 95% CI).</p>
+</dd>
+</dl>
+</section>
+<section id="returns">
+<h3>Returns:<a class="headerlink" href="#returns" title="Link to this heading">¶</a></h3>
+<dl class="simple">
+<dt>dict</dt><dd><p>Dictionary with keys ‘h’, ‘tau’, ‘alpha’, ‘f_alpha’.
+Each value is a tuple: (mean, ci_lower, ci_upper, err_low, err_high).</p>
+</dd>
+</dl>
+</section>
+</dd></dl>
+
+<dl class="py function">
 <dt class="sig sig-object py" id="mftoolkit.MFDFA.mfdfa">
 <span class="sig-prename descclassname"><span class="pre">mftoolkit.MFDFA.</span></span><span class="sig-name descname"><span class="pre">mfdfa</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">data</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">q_values</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scales</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">order</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">num_cores</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">segments_from_both_ends</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">False</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">scale_range_for_hq</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">validate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">True</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mftoolkit/MFDFA.html#mfdfa"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mftoolkit.MFDFA.mfdfa" title="Link to this definition">¶</a></dt>
 <dd><p>Performs Multifractal Detrended Fluctuations Analysis (MFDFA) in parallel.</p>
-<section id="parameters">
-<h3>Parameters:<a class="headerlink" href="#parameters" title="Link to this heading">¶</a></h3>
+<section id="id1">
+<h3>Parameters:<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>data<span class="classifier">array_like</span></dt><dd><p>The time series to analyze (one-dimensional).</p>
 </dd>
@@ -156,10 +185,14 @@ Defaults to 100.</p></li>
 </ul>
 </dd>
 <dt class="field-even">Returns<span class="colon">:</span></dt>
-<dd class="field-even"><p>A single 1D array representing the average of all surrogates.</p>
+<dd class="field-even"><p><ul class="simple">
+<li><p>If num_shuffles is 1 (default), returns a single NumPy array.</p></li>
+<li><p>If num_shuffles &gt; 1, returns a list of NumPy arrays.</p></li>
+</ul>
+</p>
 </dd>
 <dt class="field-odd">Return type<span class="colon">:</span></dt>
-<dd class="field-odd"><p>np.ndarray</p>
+<dd class="field-odd"><p>np.ndarray or list[np.ndarray]</p>
 </dd>
 </dl>
 </dd></dl>
@@ -223,8 +256,8 @@ detrended fluctuation analysis (MF-DFA). Nonlinear Dyn 113,
 <dd><p>Finds the best number of crossovers (K) using a sequential permutation test.
 SPIC: Sequential Permutation for Identifying Crossovers.
 Allows selecting between a Numba-optimized engine or a Scikit-learn based one.</p>
-<section id="id1">
-<h3>Parameters:<a class="headerlink" href="#id1" title="Link to this heading">¶</a></h3>
+<section id="id2">
+<h3>Parameters:<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>x_obs, y_obs<span class="classifier">array_like</span></dt><dd><p>The observed independent and dependent variables.</p>
 </dd>
@@ -244,8 +277,8 @@ If False, uses the Scikit-learn based engine.</p>
 </dd>
 </dl>
 </section>
-<section id="returns">
-<h3>Returns:<a class="headerlink" href="#returns" title="Link to this heading">¶</a></h3>
+<section id="id3">
+<h3>Returns:<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>list</dt><dd><p>A list of the indices (in the sorted array) where the crossovers occur.
 Returns an empty list if K=0 is the best model.</p>
@@ -286,8 +319,8 @@ crossovers.</p>
 <dt class="sig sig-object py" id="mftoolkit.mfgeneration.generate_crossover_series">
 <span class="sig-prename descclassname"><span class="pre">mftoolkit.mfgeneration.</span></span><span class="sig-name descname"><span class="pre">generate_crossover_series</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">N</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha1</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">alpha2</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">crossover_scale</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">sampling_rate</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">1.0</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">seed</span></span><span class="o"><span class="pre">=</span></span><span class="default_value"><span class="pre">None</span></span></em><span class="sig-paren">)</span><a class="reference internal" href="_modules/mftoolkit/mfgeneration.html#generate_crossover_series"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mftoolkit.mfgeneration.generate_crossover_series" title="Link to this definition">¶</a></dt>
 <dd><p>Generate time series with DFA crossover behavior using Fourier Filtering Method (FFM).</p>
-<section id="id2">
-<h3>Parameters:<a class="headerlink" href="#id2" title="Link to this heading">¶</a></h3>
+<section id="id4">
+<h3>Parameters:<a class="headerlink" href="#id4" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>N<span class="classifier">int</span></dt><dd><p>Length of time series (recommended: N &gt;= 10^4)</p>
 </dd>
@@ -303,8 +336,8 @@ crossovers.</p>
 </dd>
 </dl>
 </section>
-<section id="id3">
-<h3>Returns:<a class="headerlink" href="#id3" title="Link to this heading">¶</a></h3>
+<section id="id5">
+<h3>Returns:<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>time_series<span class="classifier">ndarray</span></dt><dd><p>Generated time series with crossover behavior</p>
 </dd>
@@ -319,8 +352,8 @@ crossovers.</p>
 <span class="sig-prename descclassname"><span class="pre">mftoolkit.mfgeneration.</span></span><span class="sig-name descname"><span class="pre">generate_fgn</span></span><span class="sig-paren">(</span><em class="sig-param"><span class="n"><span class="pre">H</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">float</span></span></em>, <em class="sig-param"><span class="n"><span class="pre">n_points</span></span><span class="p"><span class="pre">:</span></span><span class="w"> </span><span class="n"><span class="pre">int</span></span></em><span class="sig-paren">)</span> <span class="sig-return"><span class="sig-return-icon">&#x2192;</span> <span class="sig-return-typehint"><span class="pre">ndarray</span></span></span><a class="reference internal" href="_modules/mftoolkit/mfgeneration.html#generate_fgn"><span class="viewcode-link"><span class="pre">[source]</span></span></a><a class="headerlink" href="#mftoolkit.mfgeneration.generate_fgn" title="Link to this definition">¶</a></dt>
 <dd><p>Generates a time serie of a fractional Gaussian noise (fGn)
 using the Davies-Harte exact method.</p>
-<section id="id4">
-<h3>Parameters:<a class="headerlink" href="#id4" title="Link to this heading">¶</a></h3>
+<section id="id6">
+<h3>Parameters:<a class="headerlink" href="#id6" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>H<span class="classifier">float</span></dt><dd><p>Hurst exponent of the serie. Must be in the range (0, 1).</p>
 </dd>
@@ -328,8 +361,8 @@ using the Davies-Harte exact method.</p>
 </dd>
 </dl>
 </section>
-<section id="id5">
-<h3>Returns:<a class="headerlink" href="#id5" title="Link to this heading">¶</a></h3>
+<section id="id7">
+<h3>Returns:<a class="headerlink" href="#id7" title="Link to this heading">¶</a></h3>
 <dl class="simple">
 <dt>fgn_series<span class="classifier">np.ndarray</span></dt><dd><p>A 1D NumPy array containing the fGn time serie.</p>
 </dd>
@@ -408,7 +441,7 @@ component), while <cite>power</cite> controls the strength of the multifractalit
           
         </div>
       </div>
-      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
 <h1 class="logo"><a href="index.html">mf-toolkit</a></h1>
 
@@ -419,16 +452,7 @@ component), while <cite>power</cite> controls the strength of the multifractalit
 
 
 
-
-<search id="searchbox" style="display: none" role="search">
-    <div class="searchformwrapper">
-    <form class="search" action="search.html" method="get">
-      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
-      <input type="submit" value="Go" />
-    </form>
-    </div>
-</search>
-<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<h3>Navigation</h3>
 <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul class="current">
 <li class="toctree-l1 current"><a class="current reference internal" href="#">API References</a><ul>
@@ -448,6 +472,16 @@ component), while <cite>power</cite> controls the strength of the multifractalit
   </ul></li>
 </ul>
 </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
 
 
 
@@ -464,8 +498,8 @@ component), while <cite>power</cite> controls the strength of the multifractalit
       &#169;2025, Nahuel Mendez & Sebastian Jaroszewicz.
       
       |
-      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
-      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 7.3.7</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 0.7.16</a>
       
       |
       <a href="_sources/api.rst.txt"

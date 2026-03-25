@@ -3,7 +3,7 @@ from .crossovers import SPIC, CDVA
 from .mfsources import iaaft_surrogate, shuffle_surrogate
 from .mfgeneration import generate_fgn, generate_mf_corr, generate_mf_dist, generate_crossover_series
 
-__version__ = "1.0.0"
+__version__ = "1.2.0"
 
 __all__ = [
     'mfdfa',

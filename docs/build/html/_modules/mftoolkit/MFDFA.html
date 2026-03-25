@@ -5,11 +5,10 @@
     <meta charset="utf-8" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <title>mftoolkit.MFDFA &#8212; mf-toolkit 0.1.0 documentation</title>
-    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=5ecbeea2" />
-    <link rel="stylesheet" type="text/css" href="../../_static/basic.css?v=b08954a9" />
-    <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css?v=27fed22d" />
+    <link rel="stylesheet" type="text/css" href="../../_static/pygments.css?v=61cd365c" />
+    <link rel="stylesheet" type="text/css" href="../../_static/alabaster.css?v=12dfc556" />
     <script src="../../_static/documentation_options.js?v=01f34227"></script>
-    <script src="../../_static/doctools.js?v=9bcbadda"></script>
+    <script src="../../_static/doctools.js?v=9a2dae69"></script>
     <script src="../../_static/sphinx_highlight.js?v=dc90522c"></script>
     <link rel="index" title="Index" href="../../genindex.html" />
     <link rel="search" title="Search" href="../../search.html" />
@@ -37,103 +36,103 @@
 <span class="sd">@author: Nahuel Mendez &amp; Sebastian Jaroszewicz</span>
 <span class="sd">&quot;&quot;&quot;</span>
 
-<span class="kn">import</span><span class="w"> </span><span class="nn">numpy</span><span class="w"> </span><span class="k">as</span><span class="w"> </span><span class="nn">np</span>
-<span class="kn">from</span><span class="w"> </span><span class="nn">scipy</span><span class="w"> </span><span class="kn">import</span> <span class="n">stats</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">multiprocessing</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">os</span>
-<span class="kn">import</span><span class="w"> </span><span class="nn">warnings</span><span class="o">,</span><span class="nn">logging</span>
+<span class="kn">import</span> <span class="nn">numpy</span> <span class="k">as</span> <span class="nn">np</span>
+<span class="kn">from</span> <span class="nn">scipy</span> <span class="kn">import</span> <span class="n">stats</span>
+<span class="kn">from</span> <span class="nn">concurrent.futures</span> <span class="kn">import</span> <span class="n">ThreadPoolExecutor</span>
+<span class="kn">import</span> <span class="nn">os</span>
+<span class="kn">import</span> <span class="nn">warnings</span><span class="o">,</span><span class="nn">logging</span>
 <span class="n">logger</span> <span class="o">=</span> <span class="n">logging</span><span class="o">.</span><span class="n">getLogger</span><span class="p">(</span><span class="vm">__name__</span><span class="p">)</span>
 
 
 <span class="c1"># MFDFA (Multifractal Detrended Fluctuation Analysis) - Auxiliary function</span>
-<span class="k">def</span><span class="w"> </span><span class="nf">_process_scale</span><span class="p">(</span><span class="n">s_val</span><span class="p">,</span> <span class="n">profile_data</span><span class="p">,</span> <span class="n">q_values_arr</span><span class="p">,</span> <span class="n">poly_order</span><span class="p">,</span> <span class="n">N_len</span><span class="p">,</span> <span class="n">process_from_end</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
+<span class="k">def</span> <span class="nf">_process_scale</span><span class="p">(</span><span class="n">s_val</span><span class="p">,</span> <span class="n">profile_data</span><span class="p">,</span> <span class="n">q_values_arr</span><span class="p">,</span> <span class="n">poly_order</span><span class="p">,</span> <span class="n">N_len</span><span class="p">,</span> <span class="n">process_from_end</span><span class="o">=</span><span class="kc">False</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
-<span class="sd">    Processes a single scale &#39;s&#39; for MFDFA calculation.</span>
+<span class="sd">    Processes a single scale &#39;s&#39; for MFDFA calculation using vectorized matrix operations.</span>
+
+<span class="sd">    This function divides the profile data into segments of length &#39;s_val&#39;, performs </span>
+<span class="sd">    polynomial detrending on all segments simultaneously using a least-squares </span>
+<span class="sd">    solution, and computes the fluctuation function F_q for all values in q_values_arr.</span>
 
 <span class="sd">    Parameters:</span>
 <span class="sd">    -----------</span>
 <span class="sd">    s_val : int</span>
-<span class="sd">        The current scale to process.</span>
+<span class="sd">        The current scale (window size) to process.</span>
 <span class="sd">    profile_data : ndarray</span>
-<span class="sd">        The integrated profile of the time series.</span>
+<span class="sd">        The integrated profile of the time series (1D array).</span>
 <span class="sd">    q_values_arr : ndarray</span>
-<span class="sd">        Array of q values.</span>
+<span class="sd">        1D array of q exponents to compute the multifractal spectrum.</span>
 <span class="sd">    poly_order : int</span>
-<span class="sd">        Order of the polynomial for detrending.</span>
+<span class="sd">        Order of the polynomial for local detrending (e.g., 1 for linear).</span>
 <span class="sd">    N_len : int</span>
-<span class="sd">        Length of the profile (len(profile_data)).</span>
+<span class="sd">        Total length of the profile_data.</span>
 <span class="sd">    process_from_end : bool, optional</span>
-<span class="sd">        If True, process segments from start and end.</span>
-<span class="sd">        If False (default), processes only segments from the start.</span>
+<span class="sd">        If True, processes segments from both the beginning and the end of the </span>
+<span class="sd">        series (2Ns segments total), ensuring no data is lost. Default is False.</span>
 
-<span class="sd">    Return:</span>
+<span class="sd">    Returns:</span>
 <span class="sd">    --------</span>
 <span class="sd">    tuple: (int, ndarray)</span>
-<span class="sd">        The processed scale (s_val) and the array F_q for that scale.</span>
-<span class="sd">    &quot;&quot;&quot;</span>
-    <span class="k">if</span> <span class="n">s_val</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+<span class="sd">        A tuple containing:</span>
+<span class="sd">        - s_val: The processed scale.</span>
+<span class="sd">        - F_q_for_this_s: 1D array of shape (len(q_values_arr),) containing </span>
+<span class="sd">          the fluctuation values for each q.</span>
+
+<span class="sd">   &quot;&quot;&quot;</span>
+    <span class="k">if</span> <span class="n">s_val</span> <span class="o">&lt;=</span> <span class="n">poly_order</span><span class="p">:</span> <span class="c1"># Evitamos errores de grado de polinomio</span>
         <span class="k">return</span> <span class="n">s_val</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">q_values_arr</span><span class="p">))</span>
 
-    <span class="n">num_segments_for_direction</span> <span class="o">=</span> <span class="n">N_len</span> <span class="o">//</span> <span class="n">s_val</span>
+    <span class="c1"># 1. Preparar segmentos de forma matricial (Hacia adelante)</span>
+    <span class="n">num_segments</span> <span class="o">=</span> <span class="n">N_len</span> <span class="o">//</span> <span class="n">s_val</span>
+    <span class="c1"># Cortamos la serie para que sea divisible por s_val y hacemos reshape</span>
+    <span class="c1"># shape: (num_segments, s_val)</span>
+    <span class="n">segments_fwd</span> <span class="o">=</span> <span class="n">profile_data</span><span class="p">[:</span><span class="n">num_segments</span> <span class="o">*</span> <span class="n">s_val</span><span class="p">]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">num_segments</span><span class="p">,</span> <span class="n">s_val</span><span class="p">)</span>
     
-    <span class="n">segment_variances_list</span> <span class="o">=</span> <span class="p">[]</span>
-
-    <span class="c1"># Segmentos desde el inicio (siempre se procesan)</span>
-    <span class="k">for</span> <span class="n">v_idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_segments_for_direction</span><span class="p">):</span>
-        <span class="n">start_idx</span> <span class="o">=</span> <span class="n">v_idx</span> <span class="o">*</span> <span class="n">s_val</span>
-        <span class="n">end_idx</span> <span class="o">=</span> <span class="p">(</span><span class="n">v_idx</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">s_val</span>
-        <span class="k">if</span> <span class="n">end_idx</span> <span class="o">&gt;</span> <span class="n">N_len</span><span class="p">:</span> 
-            <span class="k">continue</span>
-        <span class="n">segment</span> <span class="o">=</span> <span class="n">profile_data</span><span class="p">[</span><span class="n">start_idx</span> <span class="p">:</span> <span class="n">end_idx</span><span class="p">]</span>
-        
-        <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">segment</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">poly_order</span> <span class="o">+</span> <span class="mi">1</span><span class="p">:</span> 
-            <span class="n">segment_variances_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span> 
-            <span class="k">continue</span>
-
-        <span class="n">time_axis_segment</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">segment</span><span class="p">))</span>
-        
-        <span class="n">coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">polyfit</span><span class="p">(</span><span class="n">time_axis_segment</span><span class="p">,</span> <span class="n">segment</span><span class="p">,</span> <span class="n">poly_order</span><span class="p">)</span>
-        <span class="n">trend</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">polyval</span><span class="p">(</span><span class="n">coeffs</span><span class="p">,</span> <span class="n">time_axis_segment</span><span class="p">)</span>
-        <span class="n">detrended_segment</span> <span class="o">=</span> <span class="n">segment</span> <span class="o">-</span> <span class="n">trend</span>
-        
-        <span class="n">segment_variances_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">detrended_segment</span><span class="o">**</span><span class="mi">2</span><span class="p">))</span>
-
+    <span class="c1"># 2. Preparar segmentos (Hacia atrás)</span>
     <span class="k">if</span> <span class="n">process_from_end</span><span class="p">:</span>
-        <span class="k">for</span> <span class="n">v_idx</span> <span class="ow">in</span> <span class="nb">range</span><span class="p">(</span><span class="n">num_segments_for_direction</span><span class="p">):</span>
-            <span class="n">start_idx</span> <span class="o">=</span> <span class="n">N_len</span> <span class="o">-</span> <span class="p">(</span><span class="n">v_idx</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="o">*</span> <span class="n">s_val</span>
-            <span class="n">end_idx</span> <span class="o">=</span> <span class="n">N_len</span> <span class="o">-</span> <span class="n">v_idx</span> <span class="o">*</span> <span class="n">s_val</span>
-            <span class="k">if</span> <span class="n">start_idx</span> <span class="o">&lt;</span> <span class="mi">0</span><span class="p">:</span> 
-                <span class="k">continue</span>
-            <span class="n">segment</span> <span class="o">=</span> <span class="n">profile_data</span><span class="p">[</span><span class="n">start_idx</span> <span class="p">:</span> <span class="n">end_idx</span><span class="p">]</span>
+        <span class="n">segments_bwd</span> <span class="o">=</span> <span class="n">profile_data</span><span class="p">[</span><span class="n">N_len</span> <span class="o">-</span> <span class="n">num_segments</span> <span class="o">*</span> <span class="n">s_val</span><span class="p">:]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">num_segments</span><span class="p">,</span> <span class="n">s_val</span><span class="p">)</span>
+        <span class="n">all_segments</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">([</span><span class="n">segments_fwd</span><span class="p">,</span> <span class="n">segments_bwd</span><span class="p">])</span>
+    <span class="k">else</span><span class="p">:</span>
+        <span class="n">all_segments</span> <span class="o">=</span> <span class="n">segments_fwd</span>
 
-            <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">segment</span><span class="p">)</span> <span class="o">&lt;</span> <span class="n">poly_order</span> <span class="o">+</span> <span class="mi">1</span><span class="p">:</span>
-                <span class="n">segment_variances_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="mi">0</span><span class="p">)</span>
-                <span class="k">continue</span>
-
-            <span class="n">time_axis_segment</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">segment</span><span class="p">))</span> 
-            
-            <span class="n">coeffs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">polyfit</span><span class="p">(</span><span class="n">time_axis_segment</span><span class="p">,</span> <span class="n">segment</span><span class="p">,</span> <span class="n">poly_order</span><span class="p">)</span>
-            <span class="n">trend</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">polyval</span><span class="p">(</span><span class="n">coeffs</span><span class="p">,</span> <span class="n">time_axis_segment</span><span class="p">)</span>
-            <span class="n">detrended_segment</span> <span class="o">=</span> <span class="n">segment</span> <span class="o">-</span> <span class="n">trend</span>
-            
-            <span class="n">segment_variances_list</span><span class="o">.</span><span class="n">append</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">detrended_segment</span><span class="o">**</span><span class="mi">2</span><span class="p">))</span>
+    <span class="c1"># 3. DETRENDING VECTORIZADO (El &quot;Modo Rápido&quot;)</span>
+    <span class="c1"># Creamos una sola matriz de Vandermonde para todos los segmentos</span>
+    <span class="n">x</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">arange</span><span class="p">(</span><span class="n">s_val</span><span class="p">)</span>
+    <span class="n">A</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">vander</span><span class="p">(</span><span class="n">x</span><span class="p">,</span> <span class="n">poly_order</span> <span class="o">+</span> <span class="mi">1</span><span class="p">)</span> <span class="c1"># Matriz base para el ajuste</span>
     
-    <span class="n">segment_variances_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">array</span><span class="p">(</span><span class="n">segment_variances_list</span><span class="p">)</span>
-    <span class="n">segment_variances_arr</span> <span class="o">=</span> <span class="n">segment_variances_arr</span><span class="p">[</span><span class="n">segment_variances_arr</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">]</span> 
+    <span class="c1"># Resolvemos los coeficientes para TODOS los segmentos a la vez</span>
+    <span class="c1"># A @ Coeffs = all_segments.T</span>
+    <span class="n">coeffs</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span><span class="p">,</span> <span class="n">_</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">lstsq</span><span class="p">(</span><span class="n">A</span><span class="p">,</span> <span class="n">all_segments</span><span class="o">.</span><span class="n">T</span><span class="p">,</span> <span class="n">rcond</span><span class="o">=</span><span class="kc">None</span><span class="p">)</span>
+    
+    <span class="c1"># Calculamos la tendencia y restamos</span>
+    <span class="n">trends</span> <span class="o">=</span> <span class="p">(</span><span class="n">A</span> <span class="o">@</span> <span class="n">coeffs</span><span class="p">)</span><span class="o">.</span><span class="n">T</span>
+    <span class="n">detrended</span> <span class="o">=</span> <span class="n">all_segments</span> <span class="o">-</span> <span class="n">trends</span>
+    
+    <span class="c1"># 4. Cálculo de Varianzas en bloque</span>
+    <span class="c1"># axis=1 calcula la media de cada segmento (fila)</span>
+    <span class="n">segment_variances</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">detrended</span><span class="o">**</span><span class="mi">2</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+    
+    <span class="c1"># Filtramos varianzas cero para evitar logs de números negativos o ceros</span>
+    <span class="n">segment_variances</span> <span class="o">=</span> <span class="n">segment_variances</span><span class="p">[</span><span class="n">segment_variances</span> <span class="o">&gt;</span> <span class="mi">0</span><span class="p">]</span>
+    
+    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">segment_variances</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
+        <span class="k">return</span> <span class="n">s_val</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">q_values_arr</span><span class="p">))</span>
 
+    <span class="c1"># 5. Cálculo de F_q (Vectorizado también para q)</span>
     <span class="n">F_q_for_this_s</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">zeros</span><span class="p">(</span><span class="nb">len</span><span class="p">(</span><span class="n">q_values_arr</span><span class="p">))</span>
-    <span class="k">if</span> <span class="nb">len</span><span class="p">(</span><span class="n">segment_variances_arr</span><span class="p">)</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-        <span class="k">return</span> <span class="n">s_val</span><span class="p">,</span> <span class="n">F_q_for_this_s</span> 
+    
+    <span class="c1"># Para q != 0 (Usamos broadcasting de numpy)</span>
+    <span class="n">q_non_zero</span> <span class="o">=</span> <span class="n">q_values_arr</span> <span class="o">!=</span> <span class="mi">0</span>
+    <span class="n">q_vals</span> <span class="o">=</span> <span class="n">q_values_arr</span><span class="p">[</span><span class="n">q_non_zero</span><span class="p">][:,</span> <span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">]</span> <span class="c1"># Preparamos para operar con matrices</span>
+    
+    <span class="c1"># F_q = [mean(var^(q/2))]^(1/q)</span>
+    <span class="n">f_q_vals</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">segment_variances</span><span class="o">**</span><span class="p">(</span><span class="n">q_vals</span> <span class="o">/</span> <span class="mf">2.0</span><span class="p">),</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span><span class="o">**</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">q_vals</span><span class="o">.</span><span class="n">flatten</span><span class="p">())</span>
+    <span class="n">F_q_for_this_s</span><span class="p">[</span><span class="n">q_non_zero</span><span class="p">]</span> <span class="o">=</span> <span class="n">f_q_vals</span>
+    
+    <span class="c1"># Para q == 0 (Caso especial: Exponente del promedio de logs)</span>
+    <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">q_values_arr</span> <span class="o">==</span> <span class="mi">0</span><span class="p">):</span>
+        <span class="n">q_zero_idx</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">where</span><span class="p">(</span><span class="n">q_values_arr</span> <span class="o">==</span> <span class="mi">0</span><span class="p">)[</span><span class="mi">0</span><span class="p">][</span><span class="mi">0</span><span class="p">]</span>
+        <span class="n">F_q_for_this_s</span><span class="p">[</span><span class="n">q_zero_idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">segment_variances</span><span class="p">)))</span>
 
-    <span class="k">for</span> <span class="n">i_q_idx</span><span class="p">,</span> <span class="n">q_val_current</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">q_values_arr</span><span class="p">):</span>
-        <span class="k">if</span> <span class="n">q_val_current</span> <span class="o">==</span> <span class="mi">0</span><span class="p">:</span>
-            <span class="k">if</span> <span class="n">np</span><span class="o">.</span><span class="n">any</span><span class="p">(</span><span class="n">segment_variances_arr</span> <span class="o">&lt;=</span> <span class="mi">0</span><span class="p">):</span> 
-                 <span class="n">F_q_for_this_s</span><span class="p">[</span><span class="n">i_q_idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span>
-            <span class="k">else</span><span class="p">:</span>
-                <span class="n">F_q_for_this_s</span><span class="p">[</span><span class="n">i_q_idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">exp</span><span class="p">(</span><span class="mf">0.5</span> <span class="o">*</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">segment_variances_arr</span><span class="p">)))</span>
-        <span class="k">else</span><span class="p">:</span>
-            <span class="n">F_q_for_this_s</span><span class="p">[</span><span class="n">i_q_idx</span><span class="p">]</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">segment_variances_arr</span><span class="o">**</span><span class="p">(</span><span class="n">q_val_current</span> <span class="o">/</span> <span class="mf">2.0</span><span class="p">))</span><span class="o">**</span><span class="p">(</span><span class="mf">1.0</span> <span class="o">/</span> <span class="n">q_val_current</span><span class="p">)</span>
-            
     <span class="k">return</span> <span class="n">s_val</span><span class="p">,</span> <span class="n">F_q_for_this_s</span>
 
 <span class="c1">#-----------------------------------------------------------------------------------------------------#</span>
@@ -141,7 +140,7 @@
 <span class="c1">#-----------------------------------------------------------------------------------------------------#</span>
 <div class="viewcode-block" id="mfdfa">
 <a class="viewcode-back" href="../../api.html#mftoolkit.MFDFA.mfdfa">[docs]</a>
-<span class="k">def</span><span class="w"> </span><span class="nf">mfdfa</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">q_values</span><span class="p">,</span> <span class="n">scales</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">num_cores</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
+<span class="k">def</span> <span class="nf">mfdfa</span><span class="p">(</span><span class="n">data</span><span class="p">,</span> <span class="n">q_values</span><span class="p">,</span> <span class="n">scales</span><span class="p">,</span> <span class="n">order</span><span class="o">=</span><span class="mi">1</span><span class="p">,</span> <span class="n">num_cores</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span>
           <span class="n">segments_from_both_ends</span><span class="o">=</span><span class="kc">False</span><span class="p">,</span><span class="n">scale_range_for_hq</span><span class="o">=</span><span class="kc">None</span><span class="p">,</span><span class="n">validate</span><span class="o">=</span><span class="kc">True</span><span class="p">):</span>
 <span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
 <span class="sd">    Performs Multifractal Detrended Fluctuations Analysis (MFDFA) in parallel.</span>
@@ -213,14 +212,14 @@
     <span class="c1"># =========================================================================</span>
     <span class="n">F_q_s_matrix</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">((</span><span class="nb">len</span><span class="p">(</span><span class="n">q_values_arr</span><span class="p">),</span> <span class="nb">len</span><span class="p">(</span><span class="n">scales_arr</span><span class="p">)),</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span> 
     
-    <span class="n">pool</span> <span class="o">=</span> <span class="kc">None</span>
-    <span class="k">try</span><span class="p">:</span>
-        <span class="n">pool</span> <span class="o">=</span> <span class="n">multiprocessing</span><span class="o">.</span><span class="n">Pool</span><span class="p">(</span><span class="n">processes</span><span class="o">=</span><span class="n">num_cores</span><span class="p">)</span>
-        <span class="n">results_list</span> <span class="o">=</span> <span class="n">pool</span><span class="o">.</span><span class="n">starmap</span><span class="p">(</span><span class="n">_process_scale</span><span class="p">,</span> <span class="n">tasks</span><span class="p">)</span>
-    <span class="k">finally</span><span class="p">:</span>
-        <span class="k">if</span> <span class="n">pool</span><span class="p">:</span>
-            <span class="n">pool</span><span class="o">.</span><span class="n">close</span><span class="p">()</span> 
-            <span class="n">pool</span><span class="o">.</span><span class="n">join</span><span class="p">()</span>  
+    <span class="k">if</span> <span class="n">num_cores</span> <span class="o">==</span> <span class="mi">1</span><span class="p">:</span>
+        <span class="c1"># sequential mode</span>
+        <span class="n">results_list</span> <span class="o">=</span> <span class="p">[</span><span class="n">_process_scale</span><span class="p">(</span><span class="o">*</span><span class="n">task</span><span class="p">)</span> <span class="k">for</span> <span class="n">task</span> <span class="ow">in</span> <span class="n">tasks</span><span class="p">]</span>
+        
+    <span class="k">else</span><span class="p">:</span>
+        <span class="c1"># parallel mode</span>
+        <span class="k">with</span> <span class="n">ThreadPoolExecutor</span><span class="p">(</span><span class="n">max_workers</span><span class="o">=</span><span class="n">num_cores</span><span class="p">)</span> <span class="k">as</span> <span class="n">executor</span><span class="p">:</span>
+            <span class="n">results_list</span> <span class="o">=</span> <span class="nb">list</span><span class="p">(</span><span class="n">executor</span><span class="o">.</span><span class="n">map</span><span class="p">(</span><span class="k">lambda</span> <span class="n">t</span><span class="p">:</span> <span class="n">_process_scale</span><span class="p">(</span><span class="o">*</span><span class="n">t</span><span class="p">),</span> <span class="n">tasks</span><span class="p">))</span>
 
     <span class="n">scale_to_original_idx</span> <span class="o">=</span> <span class="p">{</span><span class="n">s_val</span><span class="p">:</span> <span class="n">i</span> <span class="k">for</span> <span class="n">i</span><span class="p">,</span> <span class="n">s_val</span> <span class="ow">in</span> <span class="nb">enumerate</span><span class="p">(</span><span class="n">scales_arr</span><span class="p">)}</span>
     <span class="k">for</span> <span class="n">s_processed</span><span class="p">,</span> <span class="n">F_q_for_s_processed_arr</span> <span class="ow">in</span> <span class="n">results_list</span><span class="p">:</span>
@@ -385,13 +384,142 @@
         <span class="k">return</span> <span class="n">q_values_arr</span><span class="p">,</span> <span class="n">h_q_arr</span><span class="p">,</span> <span class="n">tau_q_arr</span><span class="p">,</span> <span class="n">alpha_arr</span><span class="p">,</span> <span class="n">f_alpha_arr</span><span class="p">,</span> <span class="n">F_q_s_matrix</span></div>
 
     
+    
+<span class="c1">#--Bootstrapping</span>
+<div class="viewcode-block" id="bootstrap_multifractal_parameters">
+<a class="viewcode-back" href="../../api.html#mftoolkit.MFDFA.bootstrap_multifractal_parameters">[docs]</a>
+<span class="k">def</span> <span class="nf">bootstrap_multifractal_parameters</span><span class="p">(</span><span class="n">scales</span><span class="p">,</span> <span class="n">F_q_s</span><span class="p">,</span> <span class="n">q_values</span><span class="p">,</span> <span class="n">n_boot</span><span class="o">=</span><span class="mi">1000</span><span class="p">,</span> <span class="n">conf_interval</span><span class="o">=</span><span class="mf">0.95</span><span class="p">):</span>
+<span class="w">    </span><span class="sd">&quot;&quot;&quot;</span>
+<span class="sd">    Performs a fully vectorized bootstrap for MFDFA parameters (h, tau, alpha, f_alpha).</span>
+<span class="sd">    Uses tensor linear algebra instead of for-loops for resampling.</span>
+
+<span class="sd">    Parameters:</span>
+<span class="sd">    -----------</span>
+<span class="sd">    scales : array (N_scales,)</span>
+<span class="sd">        The scales &#39;s&#39; used in the analysis.</span>
+<span class="sd">    F_q_s : array (N_q, N_scales)</span>
+<span class="sd">        Fluctuation function matrix (pre-filtered for NaNs/Zeros).</span>
+<span class="sd">    q_values : array (N_q,)</span>
+<span class="sd">        The q exponents.</span>
+<span class="sd">    n_boot : int</span>
+<span class="sd">        Number of bootstrap iterations.</span>
+<span class="sd">    conf_interval : float</span>
+<span class="sd">        Confidence level (e.g., 0.95 for 95% CI).</span>
+
+<span class="sd">    Returns:</span>
+<span class="sd">    --------</span>
+<span class="sd">    dict</span>
+<span class="sd">        Dictionary with keys &#39;h&#39;, &#39;tau&#39;, &#39;alpha&#39;, &#39;f_alpha&#39;.</span>
+<span class="sd">        Each value is a tuple: (mean, ci_lower, ci_upper, err_low, err_high).</span>
+<span class="sd">    &quot;&quot;&quot;</span>
+    <span class="c1"># ---------------------------------------------------------</span>
+    <span class="c1"># 1. DATA PREPARATION (Log-Log Domain)</span>
+    <span class="c1"># ---------------------------------------------------------</span>
+    <span class="n">scales</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">asarray</span><span class="p">(</span><span class="n">scales</span><span class="p">)</span>
+    <span class="n">log_scales</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">scales</span><span class="p">)</span>
+    <span class="n">log_Fqs</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">log</span><span class="p">(</span><span class="n">F_q_s</span><span class="p">)</span>
+
+    <span class="n">N_q</span><span class="p">,</span> <span class="n">N_s</span> <span class="o">=</span> <span class="n">log_Fqs</span><span class="o">.</span><span class="n">shape</span>
+
+    <span class="c1"># ---------------------------------------------------------</span>
+    <span class="c1"># 2. BASE OLS FIT &amp; RESIDUALS</span>
+    <span class="c1"># ---------------------------------------------------------</span>
+    <span class="c1"># Design Matrix X: [log_scales, 1] -&gt; Shape (N_s, 2)</span>
+    <span class="n">X</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">vstack</span><span class="p">([</span><span class="n">log_scales</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">ones</span><span class="p">(</span><span class="n">N_s</span><span class="p">)])</span><span class="o">.</span><span class="n">T</span>
+
+    <span class="c1"># Pre-calculate the OLS Projector: (X^T X)^-1 X^T -&gt; Shape (2, N_s)</span>
+    <span class="c1"># This fixed geometry is what makes the bootstrap ultra-fast.</span>
+    <span class="k">try</span><span class="p">:</span>
+        <span class="n">OLS_projector</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">inv</span><span class="p">(</span><span class="n">X</span><span class="o">.</span><span class="n">T</span> <span class="o">@</span> <span class="n">X</span><span class="p">)</span> <span class="o">@</span> <span class="n">X</span><span class="o">.</span><span class="n">T</span>
+    <span class="k">except</span> <span class="n">np</span><span class="o">.</span><span class="n">linalg</span><span class="o">.</span><span class="n">LinAlgError</span><span class="p">:</span>
+        <span class="n">warnings</span><span class="o">.</span><span class="n">warn</span><span class="p">(</span><span class="s2">&quot;Singular matrix in Bootstrap OLS. Returning NaNs.&quot;</span><span class="p">)</span>
+        <span class="n">nan_arr</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">full</span><span class="p">(</span><span class="n">N_q</span><span class="p">,</span> <span class="n">np</span><span class="o">.</span><span class="n">nan</span><span class="p">)</span>
+        <span class="k">return</span> <span class="p">{</span><span class="n">k</span><span class="p">:</span> <span class="p">(</span><span class="n">nan_arr</span><span class="p">,</span> <span class="n">nan_arr</span><span class="p">,</span> <span class="n">nan_arr</span><span class="p">,</span> <span class="n">nan_arr</span><span class="p">,</span> <span class="n">nan_arr</span><span class="p">)</span> <span class="k">for</span> <span class="n">k</span> <span class="ow">in</span> <span class="p">[</span><span class="s1">&#39;h&#39;</span><span class="p">,</span><span class="s1">&#39;tau&#39;</span><span class="p">,</span><span class="s1">&#39;alpha&#39;</span><span class="p">,</span><span class="s1">&#39;f_alpha&#39;</span><span class="p">]}</span>
+
+    <span class="c1"># Vectorized original fit for all q values simultaneously</span>
+    <span class="c1"># log_Fqs.T is (N_s, N_q). Resulting Betas are (2, N_q)</span>
+    <span class="n">Betas_orig</span> <span class="o">=</span> <span class="n">OLS_projector</span> <span class="o">@</span> <span class="n">log_Fqs</span><span class="o">.</span><span class="n">T</span>
+
+    <span class="c1"># Predictions and Residuals</span>
+    <span class="c1"># Y_pred: (N_s, 2) @ (2, N_q) -&gt; (N_s, N_q). Transposed to (N_q, N_s) to match input</span>
+    <span class="n">Y_pred</span> <span class="o">=</span> <span class="p">(</span><span class="n">X</span> <span class="o">@</span> <span class="n">Betas_orig</span><span class="p">)</span><span class="o">.</span><span class="n">T</span>
+    <span class="n">Residuals</span> <span class="o">=</span> <span class="n">log_Fqs</span> <span class="o">-</span> <span class="n">Y_pred</span>
+
+    <span class="c1"># ---------------------------------------------------------</span>
+    <span class="c1"># 3. TENSOR BOOTSTRAP (The Vectorized Magic)</span>
+    <span class="c1"># ---------------------------------------------------------</span>
+    <span class="c1"># Generate random indices for residual resampling with replacement</span>
+    <span class="c1"># Shape: (N_s, n_boot)</span>
+    <span class="n">boot_indices</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">random</span><span class="o">.</span><span class="n">randint</span><span class="p">(</span><span class="mi">0</span><span class="p">,</span> <span class="n">N_s</span><span class="p">,</span> <span class="n">size</span><span class="o">=</span><span class="p">(</span><span class="n">N_s</span><span class="p">,</span> <span class="n">n_boot</span><span class="p">))</span>
+
+    <span class="c1"># Construct the Bootstrap Residuals Tensor</span>
+    <span class="c1"># Res_boot shape: (N_q, N_s, n_boot) using fancy indexing</span>
+    <span class="n">Res_boot</span> <span class="o">=</span> <span class="n">Residuals</span><span class="p">[:,</span> <span class="n">boot_indices</span><span class="p">]</span>
+
+    <span class="c1"># Add to original prediction (Broadcasting)</span>
+    <span class="c1"># Expand Y_pred to (N_q, N_s, 1) for 3D addition</span>
+    <span class="n">Y_boot</span> <span class="o">=</span> <span class="n">Y_pred</span><span class="p">[:,</span> <span class="p">:,</span> <span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">]</span> <span class="o">+</span> <span class="n">Res_boot</span>
+
+    <span class="c1"># ---------------------------------------------------------</span>
+    <span class="c1"># 4. MASSIVE OLS SOLUTION</span>
+    <span class="c1"># ---------------------------------------------------------</span>
+    <span class="c1"># Flatten last two dimensions to solve all bootstraps in one matrix mult</span>
+    <span class="n">Y_boot_flat</span> <span class="o">=</span> <span class="n">Y_boot</span><span class="o">.</span><span class="n">transpose</span><span class="p">(</span><span class="mi">1</span><span class="p">,</span> <span class="mi">0</span><span class="p">,</span> <span class="mi">2</span><span class="p">)</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">N_s</span><span class="p">,</span> <span class="o">-</span><span class="mi">1</span><span class="p">)</span> <span class="c1"># Shape (N_s, N_q * n_boot)</span>
+
+    <span class="c1"># Single matrix multiplication</span>
+    <span class="n">Betas_boot_flat</span> <span class="o">=</span> <span class="n">OLS_projector</span> <span class="o">@</span> <span class="n">Y_boot_flat</span> <span class="c1"># Shape (2, N_q * n_boot)</span>
+
+    <span class="c1"># Reshape back to (2, N_q, n_boot). Row 0 contains h(q) slopes.</span>
+    <span class="n">h_boot_dist</span> <span class="o">=</span> <span class="n">Betas_boot_flat</span><span class="p">[</span><span class="mi">0</span><span class="p">,</span> <span class="p">:]</span><span class="o">.</span><span class="n">reshape</span><span class="p">(</span><span class="n">N_q</span><span class="p">,</span> <span class="n">n_boot</span><span class="p">)</span>
+
+    <span class="c1"># ---------------------------------------------------------</span>
+    <span class="c1"># 5. ERROR PROPAGATION (Tau, Alpha, f_Alpha)</span>
+    <span class="c1"># ---------------------------------------------------------</span>
+    <span class="c1"># A. Tau(q) = q * h(q) - 1</span>
+    <span class="n">q_col</span> <span class="o">=</span> <span class="n">q_values</span><span class="p">[:,</span> <span class="n">np</span><span class="o">.</span><span class="n">newaxis</span><span class="p">]</span>
+    <span class="n">tau_boot_dist</span> <span class="o">=</span> <span class="n">q_col</span> <span class="o">*</span> <span class="n">h_boot_dist</span> <span class="o">-</span> <span class="mi">1</span>
+
+    <span class="c1"># B. Alpha(q) = d(tau)/dq</span>
+    <span class="c1"># Compute gradient along axis 0 (q-axis) for each bootstrap column</span>
+    <span class="n">alpha_boot_dist</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">gradient</span><span class="p">(</span><span class="n">tau_boot_dist</span><span class="p">,</span> <span class="n">q_values</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">0</span><span class="p">)</span>
+
+    <span class="c1"># C. f(alpha) = q * alpha - tau</span>
+    <span class="n">f_alpha_boot_dist</span> <span class="o">=</span> <span class="n">q_col</span> <span class="o">*</span> <span class="n">alpha_boot_dist</span> <span class="o">-</span> <span class="n">tau_boot_dist</span>
+
+    <span class="c1"># ---------------------------------------------------------</span>
+    <span class="c1"># 6. STATISTICS (Percentiles)</span>
+    <span class="c1"># ---------------------------------------------------------</span>
+    <span class="n">alpha_level</span> <span class="o">=</span> <span class="mf">1.0</span> <span class="o">-</span> <span class="n">conf_interval</span>
+    <span class="n">lp</span><span class="p">,</span> <span class="n">up</span> <span class="o">=</span> <span class="p">(</span><span class="n">alpha_level</span> <span class="o">/</span> <span class="mf">2.0</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span><span class="p">,</span> <span class="p">(</span><span class="mf">1.0</span> <span class="o">-</span> <span class="n">alpha_level</span> <span class="o">/</span> <span class="mf">2.0</span><span class="p">)</span> <span class="o">*</span> <span class="mi">100</span>
+
+    <span class="n">results</span> <span class="o">=</span> <span class="p">{}</span>
+
+    <span class="k">def</span> <span class="nf">get_stats</span><span class="p">(</span><span class="n">dist_matrix</span><span class="p">):</span>
+<span class="w">        </span><span class="sd">&quot;&quot;&quot;Helper to compute mean and confidence intervals across bootstrap axis.&quot;&quot;&quot;</span>
+        <span class="n">mean_val</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">mean</span><span class="p">(</span><span class="n">dist_matrix</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">ci_low</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">dist_matrix</span><span class="p">,</span> <span class="n">lp</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        <span class="n">ci_high</span> <span class="o">=</span> <span class="n">np</span><span class="o">.</span><span class="n">percentile</span><span class="p">(</span><span class="n">dist_matrix</span><span class="p">,</span> <span class="n">up</span><span class="p">,</span> <span class="n">axis</span><span class="o">=</span><span class="mi">1</span><span class="p">)</span>
+        
+        <span class="c1"># Absolute Error Bars (distance to mean) for plotting</span>
+        <span class="n">err_low</span> <span class="o">=</span> <span class="n">mean_val</span> <span class="o">-</span> <span class="n">ci_low</span>
+        <span class="n">err_high</span> <span class="o">=</span> <span class="n">ci_high</span> <span class="o">-</span> <span class="n">mean_val</span>
+        <span class="k">return</span> <span class="n">mean_val</span><span class="p">,</span> <span class="n">ci_low</span><span class="p">,</span> <span class="n">ci_high</span><span class="p">,</span> <span class="n">err_low</span><span class="p">,</span> <span class="n">err_high</span>
+
+    <span class="n">results</span><span class="p">[</span><span class="s1">&#39;h&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">get_stats</span><span class="p">(</span><span class="n">h_boot_dist</span><span class="p">)</span>
+    <span class="n">results</span><span class="p">[</span><span class="s1">&#39;tau&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">get_stats</span><span class="p">(</span><span class="n">tau_boot_dist</span><span class="p">)</span>
+    <span class="n">results</span><span class="p">[</span><span class="s1">&#39;alpha&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">get_stats</span><span class="p">(</span><span class="n">alpha_boot_dist</span><span class="p">)</span>
+    <span class="n">results</span><span class="p">[</span><span class="s1">&#39;f_alpha&#39;</span><span class="p">]</span> <span class="o">=</span> <span class="n">get_stats</span><span class="p">(</span><span class="n">f_alpha_boot_dist</span><span class="p">)</span>
+
+    <span class="k">return</span> <span class="n">results</span></div>
+
+    
 </pre></div>
 
           </div>
           
         </div>
       </div>
-      <div class="sphinxsidebar" role="navigation" aria-label="Main">
+      <div class="sphinxsidebar" role="navigation" aria-label="main navigation">
         <div class="sphinxsidebarwrapper">
 <h1 class="logo"><a href="../../index.html">mf-toolkit</a></h1>
 
@@ -402,16 +530,7 @@
 
 
 
-
-<search id="searchbox" style="display: none" role="search">
-    <div class="searchformwrapper">
-    <form class="search" action="../../search.html" method="get">
-      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false" placeholder="Search"/>
-      <input type="submit" value="Go" />
-    </form>
-    </div>
-</search>
-<script>document.getElementById('searchbox').style.display = "block"</script><h3>Navigation</h3>
+<h3>Navigation</h3>
 <p class="caption" role="heading"><span class="caption-text">Contents:</span></p>
 <ul>
 <li class="toctree-l1"><a class="reference internal" href="../../api.html">API References</a></li>
@@ -426,6 +545,16 @@
   </ul></li>
 </ul>
 </div>
+<search id="searchbox" style="display: none" role="search">
+  <h3 id="searchlabel">Quick search</h3>
+    <div class="searchformwrapper">
+    <form class="search" action="../../search.html" method="get">
+      <input type="text" name="q" aria-labelledby="searchlabel" autocomplete="off" autocorrect="off" autocapitalize="off" spellcheck="false"/>
+      <input type="submit" value="Go" />
+    </form>
+    </div>
+</search>
+<script>document.getElementById('searchbox').style.display = "block"</script>
 
 
 
@@ -442,8 +571,8 @@
       &#169;2025, Nahuel Mendez & Sebastian Jaroszewicz.
       
       |
-      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 8.2.3</a>
-      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 1.0.0</a>
+      Powered by <a href="https://www.sphinx-doc.org/">Sphinx 7.3.7</a>
+      &amp; <a href="https://alabaster.readthedocs.io">Alabaster 0.7.16</a>
       
     </div>
 
